@@ -13,13 +13,8 @@
 <body>
 <div id="root"></div>
 <script>
-/* ============================================================
-   ВСТАВЬТЕ ВАШИ ДАННЫЕ SUPABASE СЮДА
-   Где взять: supabase.com -> ваш проект -> Project Settings -> API
-   ============================================================ */
 const SUPABASE_URL = "https://ssqfpiaklwbgljpxtxbg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcWZwaWFrbHdiZ2xqcHh0eGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNzIxOTEsImV4cCI6MjA5NjY0ODE5MX0.5TbPJPuzwBeHIakz3msGMz4LwUTCTcdlZlt3l_w_SHA";
-/* ============================================================ */
 
 window.__f1sb = null;
 try {
@@ -118,6 +113,72 @@ try {
   const PLAYER_COLORS = ["#E10600", "#27F4D2", "#FF8000", "#3671C6", "#B6BABD", "#52E252"];
   const PLAYER_ICONS = ["\u{1F534}", "\u{1FA75}", "\u{1F7E0}", "\u{1F535}", "\u26AA", "\u{1F7E2}"];
   const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
+  let soundOn = true;
+  try {
+    soundOn = localStorage.getItem("f1mono-sound") !== "0";
+  } catch {
+  }
+  let audioCtx = null;
+  function tone(freq, dur, type = "square", delay = 0, vol = 0.14) {
+    if (!soundOn) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const t = audioCtx.currentTime + delay;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(1e-3, t + dur);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    } catch {
+    }
+  }
+  const SFX = {
+    dice: () => {
+      for (let i = 0; i < 7; i++) tone(180 + Math.random() * 420, 0.045, "square", i * 0.075, 0.07);
+    },
+    turn: () => {
+      tone(880, 0.12, "sine");
+      tone(1318, 0.2, "sine", 0.13);
+    },
+    buy: () => {
+      tone(659, 0.1, "triangle");
+      tone(988, 0.16, "triangle", 0.1);
+    },
+    pay: () => {
+      tone(440, 0.12, "sawtooth", 0, 0.07);
+      tone(311, 0.2, "sawtooth", 0.12, 0.07);
+    },
+    card: () => {
+      tone(523, 0.07, "sine");
+      tone(784, 0.1, "sine", 0.08);
+    },
+    crash: () => {
+      tone(130, 0.35, "sawtooth", 0, 0.18);
+      tone(82, 0.5, "sawtooth", 0.06, 0.14);
+    },
+    build: () => {
+      tone(700, 0.06, "square", 0, 0.1);
+      tone(932, 0.07, "square", 0.08, 0.1);
+    },
+    auction: () => {
+      tone(600, 0.07, "square", 0, 0.1);
+      tone(600, 0.07, "square", 0.13, 0.1);
+      tone(740, 0.14, "square", 0.26, 0.12);
+    },
+    cash: () => {
+      tone(1175, 0.07, "sine");
+      tone(1568, 0.12, "sine", 0.08);
+    },
+    win: () => {
+      [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.28, "triangle", i * 0.16, 0.16));
+    }
+  };
   const START_MONEY = 1500;
   const GO_MONEY = 200;
   const JAIL_FEE = 50;
@@ -463,18 +524,24 @@ try {
         o.lvl = 0;
       }
     }
-    if (creditor && !creditor.bankrupt) {
+    const auctionAll = !!(st.rules && st.rules.bankAuction);
+    const aliveCreditor = creditor && !creditor.bankrupt ? creditor : null;
+    if (aliveCreditor && !auctionAll) {
       let interest = 0;
       for (const i of myProps) {
-        st.owners[i].pid = creditor.id;
+        st.owners[i].pid = aliveCreditor.id;
         if (st.owners[i].mort) interest += Math.round(CELLS[i].price * 0.05);
       }
-      if (p.money > 0) creditor.money += p.money;
+      if (p.money > 0) aliveCreditor.money += p.money;
       if (interest > 0) {
-        pay(st, creditor, interest, "bank");
-        addLog(st, `\u{1F3E6} ${creditor.name} \u043F\u043B\u0430\u0442\u0438\u0442 10% \u043F\u043E \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043D\u044B\u043C \u0437\u0430\u043B\u043E\u0433\u0430\u043C: ${interest} \u041C$`);
+        pay(st, aliveCreditor, interest, "bank");
+        addLog(st, `\u{1F3E6} ${aliveCreditor.name} \u043F\u043B\u0430\u0442\u0438\u0442 10% \u043F\u043E \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043D\u044B\u043C \u0437\u0430\u043B\u043E\u0433\u0430\u043C: ${interest} \u041C$`);
       }
     } else {
+      if (aliveCreditor && p.money > 0) {
+        aliveCreditor.money += p.money;
+        addLog(st, `\u{1F4B0} \u041E\u0441\u0442\u0430\u0442\u043E\u043A \u0434\u0435\u043D\u0435\u0433 \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 (${p.money} \u041C$) \u0443\u0445\u043E\u0434\u0438\u0442 \u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443 ${aliveCreditor.name}`);
+      }
       for (const i of myProps) delete st.owners[i];
     }
     p.money = 0;
@@ -489,7 +556,7 @@ try {
       return;
     }
     if (st.players[st.turn].id === p.id) nextTurn(st);
-    if (!creditor && myProps.length) {
+    if ((auctionAll || !aliveCreditor) && myProps.length) {
       st.pending = { type: "auction", pos: myProps[0], bids: {}, queue: myProps.slice(1) };
       addLog(st, `\u{1F528} \u0418\u043C\u0443\u0449\u0435\u0441\u0442\u0432\u043E \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 \u0443\u0445\u043E\u0434\u0438\u0442 \u0441 \u043C\u043E\u043B\u043E\u0442\u043A\u0430. \u041F\u0435\u0440\u0432\u044B\u0439 \u043B\u043E\u0442: \xAB${CELLS[myProps[0]].name}\xBB`);
     }
@@ -624,6 +691,9 @@ try {
     const [rolling, setRolling] = useState(false);
     const [animDice, setAnimDice] = useState([1, 1]);
     const [tradeOpen, setTradeOpen] = useState(false);
+    const [view, setView] = useState("board");
+    const [snd, setSnd] = useState(soundOn);
+    const lastLogRef = useRef(null);
     const pollRef = useRef(null);
     const stRef = useRef(null);
     stRef.current = st;
@@ -665,8 +735,39 @@ try {
           if (navigator.vibrate) navigator.vibrate(120);
         } catch {
         }
+        SFX.turn();
       }
     }, [st && st.phase, st && st.turn, myId]);
+    useEffect(() => {
+      if (!st || !st.log || !st.log.length) return;
+      const top = st.log[0];
+      if (lastLogRef.current === null) {
+        lastLogRef.current = top;
+        return;
+      }
+      if (top === lastLogRef.current) return;
+      lastLogRef.current = top;
+      if (st.phase === "over") {
+        SFX.win();
+        return;
+      }
+      if (top.startsWith("\u{1F91D}")) SFX.buy();
+      else if (top.startsWith("\u{1F4A5}") || top.startsWith("\u{1F3F3}\uFE0F")) SFX.crash();
+      else if (top.startsWith("\u{1F528}")) SFX.auction();
+      else if (top.includes("\u043F\u043B\u0430\u0442\u0438\u0442 \u0430\u0440\u0435\u043D\u0434\u0443") || top.includes("\u0434\u0432\u043E\u0439\u043D\u0443\u044E \u0430\u0440\u0435\u043D\u0434\u0443") || top.includes("\u043F\u043B\u0430\u0442\u0438\u0442 \xAB")) SFX.pay();
+      else if (top.startsWith("\u{1F6A8}") || top.startsWith("\u{1F4CB}")) SFX.card();
+      else if (top.startsWith("\u{1F529}")) SFX.build();
+      else if (top.startsWith("\u{1F3C1}") || top.startsWith("\u{1F3C6}") || top.startsWith("\u{1F4B0}")) SFX.cash();
+    }, [st && st.log && st.log[0], st && st.phase]);
+    const toggleSound = () => {
+      soundOn = !soundOn;
+      try {
+        localStorage.setItem("f1mono-sound", soundOn ? "1" : "0");
+      } catch {
+      }
+      setSnd(soundOn);
+      if (soundOn) SFX.turn();
+    };
     const mutate = useCallback(
       async (fn) => {
         if (busy) return;
@@ -710,7 +811,7 @@ try {
         winner: null,
         pot: 0,
         trade: null,
-        rules: { pot: false },
+        rules: { pot: false, bankAuction: false },
         decks: null,
         log: [`\u{1F3DF}\uFE0F \u041A\u043E\u043C\u043D\u0430\u0442\u0430 ${c} \u0441\u043E\u0437\u0434\u0430\u043D\u0430. \u0416\u0434\u0451\u043C \u043F\u0438\u043B\u043E\u0442\u043E\u0432...`]
       };
@@ -809,11 +910,15 @@ try {
       addLog(s, `\u{1F6A6} \u041E\u0433\u043D\u0438 \u043F\u043E\u0433\u0430\u0441\u043B\u0438 \u2014 \u0413\u041E\u041D\u041A\u0410 \u041D\u0410\u0427\u0410\u041B\u0410\u0421\u042C! \u041F\u0435\u0440\u0432\u044B\u0439 \u0445\u043E\u0434: ${s.players[0].name}`);
     });
     const actTogglePot = () => mutate((s) => {
-      s.rules = { pot: !(s.rules && s.rules.pot) };
+      s.rules = { ...s.rules || {}, pot: !(s.rules && s.rules.pot) };
+    });
+    const actToggleBankAuction = () => mutate((s) => {
+      s.rules = { ...s.rules || {}, bankAuction: !(s.rules && s.rules.bankAuction) };
     });
     const actRoll = () => {
       if (rolling || busy) return;
       setRolling(true);
+      SFX.dice();
       const iv = setInterval(() => setAnimDice([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]), 90);
       setTimeout(() => {
         clearInterval(iv);
@@ -1012,7 +1117,16 @@ try {
           onClick: actTogglePot
         },
         st.rules && st.rules.pot ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B"
-      ) : /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: st.rules && st.rules.pot ? "#F5C518" : "#5A6172" } }, st.rules && st.rules.pot ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B")), isHost ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red pulse", style: { width: "100%", marginTop: 18 }, disabled: st.players.length < 2 || busy, onClick: actStart }, "\u{1F6A6} \u0421\u0442\u0430\u0440\u0442 \u0433\u043E\u043D\u043A\u0438 ", st.players.length < 2 ? "(\u043D\u0443\u0436\u043D\u043E \u22652)" : "") : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", marginTop: 18, fontSize: 14 } }, "\u0416\u0434\u0451\u043C, \u043A\u043E\u0433\u0434\u0430 \u0445\u043E\u0437\u044F\u0438\u043D \u0434\u0430\u0441\u0442 \u0441\u0442\u0430\u0440\u0442..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 12 }, onClick: leave }, "\u0412\u044B\u0439\u0442\u0438")));
+      ) : /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: st.rules && st.rules.pot ? "#F5C518" : "#5A6172" } }, st.rules && st.rules.pot ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B")), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.4 } }, "\u{1F528} \u0411\u0430\u043D\u043A\u0440\u043E\u0442\u0441\u0442\u0432\u043E \u2192 \u0430\u0443\u043A\u0446\u0438\u043E\u043D", /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#8B93A3" } }, "\u0414\u043E\u043C\u0430\u0448\u043D\u0435\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u043E: \u0438\u043C\u0443\u0449\u0435\u0441\u0442\u0432\u043E \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 \u0432\u0441\u0435\u0433\u0434\u0430 \u0443\u0445\u043E\u0434\u0438\u0442 \u0441 \u043C\u043E\u043B\u043E\u0442\u043A\u0430 \u043C\u0435\u0436\u0434\u0443 \u0438\u0433\u0440\u043E\u043A\u0430\u043C\u0438 (\u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u0434\u0435\u043D\u0435\u0433). \u0412\u044B\u043A\u043B = \u043E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u043E: \u0432\u0441\u0451 \u0434\u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443.")), isHost ? /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "btn",
+          style: { padding: "8px 14px", background: st.rules && st.rules.bankAuction ? "#F5C518" : "#22262F", color: st.rules && st.rules.bankAuction ? "#1a1a1a" : "#8B93A3", fontSize: 13 },
+          disabled: busy,
+          onClick: actToggleBankAuction
+        },
+        st.rules && st.rules.bankAuction ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B"
+      ) : /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: st.rules && st.rules.bankAuction ? "#F5C518" : "#5A6172" } }, st.rules && st.rules.bankAuction ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B")), isHost ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red pulse", style: { width: "100%", marginTop: 18 }, disabled: st.players.length < 2 || busy, onClick: actStart }, "\u{1F6A6} \u0421\u0442\u0430\u0440\u0442 \u0433\u043E\u043D\u043A\u0438 ", st.players.length < 2 ? "(\u043D\u0443\u0436\u043D\u043E \u22652)" : "") : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", marginTop: 18, fontSize: 14 } }, "\u0416\u0434\u0451\u043C, \u043A\u043E\u0433\u0434\u0430 \u0445\u043E\u0437\u044F\u0438\u043D \u0434\u0430\u0441\u0442 \u0441\u0442\u0430\u0440\u0442..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 12 }, onClick: leave }, "\u0412\u044B\u0439\u0442\u0438")));
     }
     const playersAt = (i) => st.players.filter((p) => !p.bankrupt && p.pos === i);
     const inDebt = me.money < 0;
@@ -1031,16 +1145,78 @@ try {
           key: i,
           className: "cellbtn",
           onClick: () => setOpenCell(i),
-          style: { gridRow: r + 1, gridColumn: col + 1, borderRadius: 4, ...c.t === "start" ? { background: "repeating-conic-gradient(#fff 0 25%, #14171E 0 50%) 0 0/8px 8px" } : {} }
+          style: {
+            gridRow: r + 1,
+            gridColumn: col + 1,
+            borderRadius: 4,
+            ...c.t === "start" ? { background: "repeating-conic-gradient(#fff 0 25%, #14171E 0 50%) 0 0/8px 8px" } : {},
+            ...st.phase === "playing" && cur && !cur.bankrupt && cur.pos === i ? { boxShadow: `0 0 0 2px ${cur.color}, 0 0 9px ${cur.color}`, zIndex: 3 } : {}
+          }
         },
-        c.g && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "22%", background: GROUPS[c.g].c } }),
-        c.tc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "22%", background: c.tc } }),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: "min(3.4vw,15px)", zIndex: 1, filter: c.t === "start" ? "drop-shadow(0 0 2px #000)" : "none" } }, c.e),
+        c.g && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "26%", background: GROUPS[c.g].c } }),
+        c.tc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "26%", background: c.tc } }),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: "min(4vw,17px)", zIndex: 1, filter: c.t === "start" ? "drop-shadow(0 0 2px #000)" : "none" } }, c.e),
         o && o.lvl > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "24%", right: 1, fontSize: 7, color: "#F5C518", zIndex: 2 } }, o.lvl >= 5 ? "\u2605" : "\u2022".repeat(o.lvl)),
         ownerP && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4, background: ownerP.color } }),
         o && o.mort && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(10,12,16,.6)", zIndex: 2, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", fontSize: 8, padding: 1 } }, "\u{1F512}"),
-        here.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 5, left: 2, right: 2, display: "flex", gap: 1, justifyContent: "center", zIndex: 2 } }, here.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { width: 7, height: 7, borderRadius: 4, background: p.color, border: "1px solid #fff", boxShadow: "0 0 3px #000" } })))
+        here.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 5, left: 2, right: 2, display: "flex", gap: 1, justifyContent: "center", zIndex: 2 } }, here.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { width: 9, height: 9, borderRadius: 5, background: p.color, border: "1.5px solid #fff", boxShadow: "0 0 3px #000" } })))
       );
+    };
+    const listEl = () => {
+      const row = (i) => {
+        const c = CELLS[i];
+        const o = st.owners[i];
+        const ownerP = o && st.players.find((p) => p.id === o.pid);
+        const here = playersAt(i);
+        let right;
+        if (!o) right = /* @__PURE__ */ React.createElement("span", { style: { color: "#8B93A3", fontSize: 12.5, flexShrink: 0 } }, c.price, " \u041C$");
+        else if (o.mort) right = /* @__PURE__ */ React.createElement("span", { style: { color: "#FF8787", fontSize: 12, flexShrink: 0 } }, "\u{1F512} \u0437\u0430\u043B\u043E\u0433");
+        else if (c.t === "util") right = /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 12, flexShrink: 0 } }, utilCount(st, o.pid) === 2 ? "10" : "4", "\xD7 \u0431\u0440\u043E\u0441\u043A\u0430");
+        else right = /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 12.5, flexShrink: 0 } }, "\u0430\u0440\u0435\u043D\u0434\u0430 ", calcRent(st, i, 7));
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: i,
+            onClick: () => setOpenCell(i),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              padding: "9px 10px",
+              background: "#171A21",
+              border: "1px solid #232834",
+              borderLeft: `4px solid ${c.g ? GROUPS[c.g].c : c.tc || "#2C313C"}`,
+              color: "#fff",
+              borderRadius: 8,
+              marginBottom: 4,
+              cursor: "pointer",
+              boxSizing: "border-box"
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16 } }, c.e),
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "left", fontSize: 13.5, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" } }, c.name, o && o.lvl > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 11 } }, o.lvl >= 5 ? "\u2605" : "\u2022".repeat(o.lvl)), here.map((p) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { width: 9, height: 9, borderRadius: 5, background: p.color, border: "1px solid #fff", display: "inline-block" } }))),
+          ownerP && /* @__PURE__ */ React.createElement("span", { style: { width: 10, height: 10, borderRadius: 5, background: ownerP.color, flexShrink: 0 }, title: ownerP.name }),
+          right
+        );
+      };
+      const header = (txt) => /* @__PURE__ */ React.createElement("div", { className: "disp", key: "h" + txt, style: { fontSize: 11, color: "#5A6172", margin: "10px 2px 6px" } }, txt);
+      const items = [];
+      for (const g of Object.keys(GROUPS)) {
+        items.push(header(GROUPS[g].name.toUpperCase()));
+        CELLS.forEach((c, i) => {
+          if (c.g === g) items.push(row(i));
+        });
+      }
+      items.push(header("\u041A\u041E\u041C\u0410\u041D\u0414\u042B"));
+      CELLS.forEach((c, i) => {
+        if (c.t === "team") items.push(row(i));
+      });
+      items.push(header("\u041F\u041E\u0421\u0422\u0410\u0412\u0429\u0418\u041A\u0418"));
+      CELLS.forEach((c, i) => {
+        if (c.t === "util") items.push(row(i));
+      });
+      return /* @__PURE__ */ React.createElement("div", { className: "card", style: { maxHeight: "55vh", overflowY: "auto", padding: "4px 8px 8px" } }, items);
     };
     const cellModal = () => {
       if (openCell == null) return null;
@@ -1058,7 +1234,7 @@ try {
         return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, cb.ok && /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", disabled: me.money < upCost(c.price) || busy, onClick: () => actBuild(openCell) }, "\u{1F529} \u0410\u043F\u0433\u0440\u0435\u0439\u0434 \u2212", upCost(c.price)), cs.ok && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => actSellUp(openCell) }, "\u0421\u043D\u044F\u0442\u044C \u0430\u043F\u0433\u0440\u0435\u0439\u0434 +", Math.round(upCost(c.price) / 2)), canMort && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => actMortgage(openCell) }, "\u{1F3E6} \u0417\u0430\u043B\u043E\u0436\u0438\u0442\u044C +", Math.round(c.price / 2)), o.mort && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", disabled: busy || me.money < unmortCost, onClick: () => actUnmortgage(openCell) }, "\u0412\u044B\u043A\u0443\u043F\u0438\u0442\u044C \u2212", unmortCost)), (cb.why || cs.why) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: "#8B93A3", marginTop: 8 } }, "\u2139\uFE0F ", cb.why || cs.why), c.t === "prop" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#5A6172", marginTop: 6 } }, "\u0412 \u0431\u0430\u043D\u043A\u0435: \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u043E\u0432 ", HOUSES_TOTAL - housesUsed(st), "/", HOUSES_TOTAL, " \xB7 \u0441\u0442\u0430\u0442\u0443\u0441\u043E\u0432 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438 ", HOTELS_TOTAL - hotelsUsed(st), "/", HOTELS_TOTAL));
       })(), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 14 }, onClick: () => setOpenCell(null) }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044C")));
     };
-    return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30 } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", maxWidth: 560, padding: "10px 8px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 8px" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16 } }, "F1", /* @__PURE__ */ React.createElement("span", { style: { color: "#E10600" } }, " \u041C\u041E\u041D\u041E\u041F\u041E\u041B\u0418\u042F")), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: "#F5C518", letterSpacing: ".18em" } }, code)), /* @__PURE__ */ React.createElement("div", { className: "kerb", style: { padding: 5, borderRadius: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0E1117", borderRadius: 8, padding: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(11,1fr)", gridTemplateRows: "repeat(11,1fr)", gap: 2, aspectRatio: "1/1" } }, CELLS.map((_, i) => cellEl(i)), /* @__PURE__ */ React.createElement("div", { style: { gridRow: "2 / 11", gridColumn: "2 / 11", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, textAlign: "center", padding: 8 } }, st.phase === "over" && winnerP ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 40 } }, "\u{1F3C6}"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 20, color: "#F5C518" } }, winnerP.name), /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", fontSize: 13 } }, "\u0427\u0435\u043C\u043F\u0438\u043E\u043D \u043C\u0438\u0440\u0430!")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 12, height: 12, borderRadius: 6, background: cur.color }, className: myTurn ? "pulse" : "" }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(4vw,17px)" } }, myTurn ? "\u0412\u0410\u0428 \u0425\u041E\u0414" : `\u0425\u041E\u0414: ${cur.name.toUpperCase()}`)), (rolling || st.dice) && /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(8vw,34px)", letterSpacing: ".1em" } }, DICE[(rolling ? animDice : st.dice)[0]], " ", DICE[(rolling ? animDice : st.dice)[1]]), (st.pot || 0) > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#F5C518" } }, "\u{1F3C6} \u0411\u0430\u043D\u043A \u041F\u043E\u0434\u0438\u0443\u043C\u0430: ", st.pot, " \u041C$"), cur.inJail && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#FF8787" } }, "\u{1F527} ", cur.name, " \u043D\u0430 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0435")))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: 12 } }, st.phase === "playing" && st.pending && st.pending.type === "auction" && /* @__PURE__ */ React.createElement(AuctionPanel, { st, me, busy, onBid: actBid }), st.phase === "playing" && st.trade && st.trade.from === myId && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, fontSize: 13.5, color: "#8B93A3" } }, /* @__PURE__ */ React.createElement("span", null, "\u23F3 \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043E\u0431\u043C\u0435\u043D\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { padding: "6px 10px", fontSize: 12 }, disabled: busy, onClick: actTradeCancel }, "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C")), st.phase === "over" ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { width: "100%" }, onClick: leave }, "\u{1F3C1} \u041D\u043E\u0432\u0430\u044F \u0433\u043E\u043D\u043A\u0430") : myTurn ? /* @__PURE__ */ React.createElement(React.Fragment, null, st.pending && st.pending.type === "buy" && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 8 } }, "\u041A\u0443\u043F\u0438\u0442\u044C ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].e, " ", CELLS[st.pending.pos].name), " \u0437\u0430 ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].price, " \u041C$"), "?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { flex: 1 }, disabled: busy || me.money < CELLS[st.pending.pos].price, onClick: actBuy }, "\u041A\u0443\u043F\u0438\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { flex: 1 }, disabled: busy, onClick: actToAuction }, "\u{1F528} \u041D\u0430 \u0430\u0443\u043A\u0446\u0438\u043E\u043D"))), inDebt && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#FF8787", fontSize: 14, marginBottom: 8 } }, "\u26A0\uFE0F \u0414\u043E\u043B\u0433: ", -me.money, " \u041C$. \u0421\u043D\u0438\u043C\u0438\u0442\u0435 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438\u043B\u0438 \u0437\u0430\u043B\u043E\u0436\u0438\u0442\u0435 \u0442\u0440\u0430\u0441\u0441\u044B (\u0442\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u0441\u0432\u043E\u0435\u0439 \u043A\u043B\u0435\u0442\u043A\u0435) \u2014 \u0438\u043B\u0438 \u0441\u043E\u0439\u0434\u0438\u0442\u0435 \u0441 \u0434\u0438\u0441\u0442\u0430\u043D\u0446\u0438\u0438."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", color: "#FF8787" }, disabled: busy, onClick: actBankrupt }, "\u{1F3F3}\uFE0F \u041E\u0431\u044A\u044F\u0432\u0438\u0442\u044C \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0441\u0442\u0432\u043E")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, me.inJail && !st.rolled && (me.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", disabled: busy, onClick: actUseGojf }, "\u{1F39F}"), me.inJail && !st.rolled && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy || me.money < JAIL_FEE, onClick: actPayJail }, "\u{1F527} \u2212", JAIL_FEE), /* @__PURE__ */ React.createElement("button", { className: "btn btn-red" + (canRoll && !rolling ? " pulse" : ""), style: { flex: 1 }, disabled: !canRoll || busy || rolling, onClick: actRoll }, "\u{1F3B2} \u0411\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u0443\u0431\u0438\u043A\u0438"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", style: { flex: 1 }, disabled: !canEnd || busy || rolling, onClick: actEnd }, "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0445\u043E\u0434 \u25B6")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 8, fontSize: 13 }, disabled: busy || !!st.trade || !!st.pending || inDebt, onClick: () => setTradeOpen(true) }, "\u{1F501} \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0438\u0442\u044C \u043E\u0431\u043C\u0435\u043D"), /* @__PURE__ */ React.createElement("div", { style: { color: "#5A6172", fontSize: 12, marginTop: 8 } }, "\u0422\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u043A\u043B\u0435\u0442\u043A\u0435 \u2014 \u0434\u0435\u0442\u0430\u043B\u0438, \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438 \u043F\u0440\u043E\u0434\u0430\u0436\u0430.")) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", fontSize: 14, padding: "4px 0" } }, st.pending && st.pending.type === "buy" ? `\u23F3 ${cur.name} \u0440\u0435\u0448\u0430\u0435\u0442, \u043F\u043E\u043A\u0443\u043F\u0430\u0442\u044C \u043B\u0438 \xAB${CELLS[st.pending.pos].name}\xBB...` : st.pending ? null : `\u23F3 \u0416\u0434\u0451\u043C \u0445\u043E\u0434: ${cur.name}`)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 } }, st.players.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "card", style: { padding: "9px 12px", opacity: p.bankrupt ? 0.4 : 1, border: p.id === cur.id && st.phase === "playing" ? `1px solid ${p.color}` : "1px solid #262B36" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 11, height: 11, borderRadius: 6, background: p.color, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name, p.id === myId ? " (\u0432\u044B)" : "")), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16, marginTop: 3, color: p.money < 0 ? "#FF6B6B" : "#fff" } }, p.bankrupt ? "\u{1F3F3}\uFE0F DNF" : `${p.money} \u041C$`, !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#8B93A3" } }, " \xB7 \u{1F3DF} ", Object.values(st.owners).filter((o) => o.pid === p.id).length), !p.bankrupt && (p.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#F5C518" } }, " \u{1F39F}", p.gojf.length), p.inJail && !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12 } }, " \u{1F527}"))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: "10px 14px", maxHeight: 150, overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 11, color: "#5A6172", marginBottom: 6 } }, "\u0420\u0410\u0414\u0418\u041E \u041A\u041E\u041C\u0410\u041D\u0414\u042B"), st.log.slice(0, 15).map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 13, color: i === 0 ? "#EDEFF3" : "#8B93A3", padding: "2.5px 0", lineHeight: 1.45 } }, l))), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 10, fontSize: 13 }, onClick: leave }, "\u041F\u043E\u043A\u0438\u043D\u0443\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443")), tradeOpen && /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30 } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", maxWidth: 560, padding: "10px 8px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 8px" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16 } }, "F1", /* @__PURE__ */ React.createElement("span", { style: { color: "#E10600" } }, " \u041C\u041E\u041D\u041E\u041F\u041E\u041B\u0418\u042F")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: toggleSound, style: { background: "none", border: "none", fontSize: 17, cursor: "pointer", padding: 2 } }, snd ? "\u{1F50A}" : "\u{1F507}"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: "#F5C518", letterSpacing: ".18em" } }, code))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "btn", style: { flex: 1, padding: "8px", fontSize: 13, background: view === "board" ? "#E10600" : "#22262F", color: "#fff" }, onClick: () => setView("board") }, "\u{1F5FA} \u041F\u043E\u043B\u0435"), /* @__PURE__ */ React.createElement("button", { className: "btn", style: { flex: 1, padding: "8px", fontSize: 13, background: view === "list" ? "#E10600" : "#22262F", color: "#fff" }, onClick: () => setView("list") }, "\u{1F4CB} \u0422\u0440\u0430\u0441\u0441\u044B")), view === "board" ? /* @__PURE__ */ React.createElement("div", { className: "kerb", style: { padding: 5, borderRadius: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0E1117", borderRadius: 8, padding: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(11,1fr)", gridTemplateRows: "repeat(11,1fr)", gap: 2, aspectRatio: "1/1" } }, CELLS.map((_, i) => cellEl(i)), /* @__PURE__ */ React.createElement("div", { style: { gridRow: "2 / 11", gridColumn: "2 / 11", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, textAlign: "center", padding: 8 } }, st.phase === "over" && winnerP ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 40 } }, "\u{1F3C6}"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 20, color: "#F5C518" } }, winnerP.name), /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", fontSize: 13 } }, "\u0427\u0435\u043C\u043F\u0438\u043E\u043D \u043C\u0438\u0440\u0430!")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 12, height: 12, borderRadius: 6, background: cur.color }, className: myTurn ? "pulse" : "" }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(4vw,17px)" } }, myTurn ? "\u0412\u0410\u0428 \u0425\u041E\u0414" : `\u0425\u041E\u0414: ${cur.name.toUpperCase()}`)), (rolling || st.dice) && /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(8vw,34px)", letterSpacing: ".1em" } }, DICE[(rolling ? animDice : st.dice)[0]], " ", DICE[(rolling ? animDice : st.dice)[1]]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#8B93A3" } }, "\u0412\u044B \u0437\u0434\u0435\u0441\u044C: ", CELLS[me.pos].e, " ", CELLS[me.pos].name), (st.pot || 0) > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#F5C518" } }, "\u{1F3C6} \u0411\u0430\u043D\u043A \u041F\u043E\u0434\u0438\u0443\u043C\u0430: ", st.pot, " \u041C$"), cur.inJail && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#FF8787" } }, "\u{1F527} ", cur.name, " \u043D\u0430 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0435")))))) : listEl(), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 8, padding: "8px 12px", display: "flex", gap: 8, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("span", { style: { flexShrink: 0, fontSize: 13 } }, "\u{1F4FB}"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, lineHeight: 1.4 } }, st.log[0])), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: 12 } }, st.phase === "playing" && st.pending && st.pending.type === "auction" && /* @__PURE__ */ React.createElement(AuctionPanel, { st, me, busy, onBid: actBid }), st.phase === "playing" && st.trade && st.trade.from === myId && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, fontSize: 13.5, color: "#8B93A3" } }, /* @__PURE__ */ React.createElement("span", null, "\u23F3 \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043E\u0431\u043C\u0435\u043D\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { padding: "6px 10px", fontSize: 12 }, disabled: busy, onClick: actTradeCancel }, "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C")), st.phase === "over" ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { width: "100%" }, onClick: leave }, "\u{1F3C1} \u041D\u043E\u0432\u0430\u044F \u0433\u043E\u043D\u043A\u0430") : myTurn ? /* @__PURE__ */ React.createElement(React.Fragment, null, st.pending && st.pending.type === "buy" && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 8 } }, "\u041A\u0443\u043F\u0438\u0442\u044C ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].e, " ", CELLS[st.pending.pos].name), " \u0437\u0430 ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].price, " \u041C$"), "?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { flex: 1 }, disabled: busy || me.money < CELLS[st.pending.pos].price, onClick: actBuy }, "\u041A\u0443\u043F\u0438\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { flex: 1 }, disabled: busy, onClick: actToAuction }, "\u{1F528} \u041D\u0430 \u0430\u0443\u043A\u0446\u0438\u043E\u043D"))), inDebt && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#FF8787", fontSize: 14, marginBottom: 8 } }, "\u26A0\uFE0F \u0414\u043E\u043B\u0433: ", -me.money, " \u041C$. \u0421\u043D\u0438\u043C\u0438\u0442\u0435 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438\u043B\u0438 \u0437\u0430\u043B\u043E\u0436\u0438\u0442\u0435 \u0442\u0440\u0430\u0441\u0441\u044B (\u0442\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u0441\u0432\u043E\u0435\u0439 \u043A\u043B\u0435\u0442\u043A\u0435) \u2014 \u0438\u043B\u0438 \u0441\u043E\u0439\u0434\u0438\u0442\u0435 \u0441 \u0434\u0438\u0441\u0442\u0430\u043D\u0446\u0438\u0438."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", color: "#FF8787" }, disabled: busy, onClick: actBankrupt }, "\u{1F3F3}\uFE0F \u041E\u0431\u044A\u044F\u0432\u0438\u0442\u044C \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0441\u0442\u0432\u043E")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, me.inJail && !st.rolled && (me.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", disabled: busy, onClick: actUseGojf }, "\u{1F39F}"), me.inJail && !st.rolled && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy || me.money < JAIL_FEE, onClick: actPayJail }, "\u{1F527} \u2212", JAIL_FEE), /* @__PURE__ */ React.createElement("button", { className: "btn btn-red" + (canRoll && !rolling ? " pulse" : ""), style: { flex: 1 }, disabled: !canRoll || busy || rolling, onClick: actRoll }, "\u{1F3B2} \u0411\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u0443\u0431\u0438\u043A\u0438"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", style: { flex: 1 }, disabled: !canEnd || busy || rolling, onClick: actEnd }, "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0445\u043E\u0434 \u25B6")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 8, fontSize: 13 }, disabled: busy || !!st.trade || !!st.pending || inDebt, onClick: () => setTradeOpen(true) }, "\u{1F501} \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0438\u0442\u044C \u043E\u0431\u043C\u0435\u043D"), /* @__PURE__ */ React.createElement("div", { style: { color: "#5A6172", fontSize: 12, marginTop: 8 } }, "\u0422\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u043A\u043B\u0435\u0442\u043A\u0435 \u2014 \u0434\u0435\u0442\u0430\u043B\u0438, \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438 \u043F\u0440\u043E\u0434\u0430\u0436\u0430.")) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", fontSize: 14, padding: "4px 0" } }, st.pending && st.pending.type === "buy" ? `\u23F3 ${cur.name} \u0440\u0435\u0448\u0430\u0435\u0442, \u043F\u043E\u043A\u0443\u043F\u0430\u0442\u044C \u043B\u0438 \xAB${CELLS[st.pending.pos].name}\xBB...` : st.pending ? null : `\u23F3 \u0416\u0434\u0451\u043C \u0445\u043E\u0434: ${cur.name}`)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 } }, st.players.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "card", style: { padding: "9px 12px", opacity: p.bankrupt ? 0.4 : 1, border: p.id === cur.id && st.phase === "playing" ? `1px solid ${p.color}` : "1px solid #262B36" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 11, height: 11, borderRadius: 6, background: p.color, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name, p.id === myId ? " (\u0432\u044B)" : "")), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16, marginTop: 3, color: p.money < 0 ? "#FF6B6B" : "#fff" } }, p.bankrupt ? "\u{1F3F3}\uFE0F DNF" : `${p.money} \u041C$`, !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#8B93A3" } }, " \xB7 \u{1F3DF} ", Object.values(st.owners).filter((o) => o.pid === p.id).length), !p.bankrupt && (p.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#F5C518" } }, " \u{1F39F}", p.gojf.length), p.inJail && !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12 } }, " \u{1F527}"))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: "10px 14px", maxHeight: 150, overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 11, color: "#5A6172", marginBottom: 6 } }, "\u0420\u0410\u0414\u0418\u041E \u041A\u041E\u041C\u0410\u041D\u0414\u042B"), st.log.slice(0, 15).map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 13, color: i === 0 ? "#EDEFF3" : "#8B93A3", padding: "2.5px 0", lineHeight: 1.45 } }, l))), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 10, fontSize: 13 }, onClick: leave }, "\u041F\u043E\u043A\u0438\u043D\u0443\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443")), tradeOpen && /* @__PURE__ */ React.createElement(
       TradeBuilder,
       {
         st,
