@@ -1,0 +1,1256 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>F1 Монополия</title>
+<meta name="theme-color" content="#0C0E12">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>html,body,#root{margin:0;padding:0;background:#0C0E12;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const SUPABASE_URL = "https://ssqfpiaklwbgljpxtxbg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcWZwaWFrbHdiZ2xqcHh0eGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNzIxOTEsImV4cCI6MjA5NjY0ODE5MX0.5TbPJPuzwBeHIakz3msGMz4LwUTCTcdlZlt3l_w_SHA";
+
+window.__f1sb = null;
+try {
+  if (!SUPABASE_URL.includes("ВСТАВЬТЕ") && !SUPABASE_ANON_KEY.includes("ВСТАВЬТЕ")) {
+    window.__f1sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+} catch (e) { console.error("Supabase init error:", e); }
+</script>
+<script>
+(() => {
+  const { useState, useEffect, useRef, useCallback } = React;
+  const GROUPS = {
+    br: { c: "#9C6B3C", name: "\u041E\u043A\u0435\u0430\u043D\u0438\u044F \u0438 \u0410\u0437\u0438\u044F" },
+    lb: { c: "#5BC8E8", name: "\u0411\u043B\u0438\u0436\u043D\u0438\u0439 \u0412\u043E\u0441\u0442\u043E\u043A" },
+    pk: { c: "#E64980", name: "\u0413\u043E\u0440\u043E\u0434\u0441\u043A\u0438\u0435 \u0442\u0440\u0430\u0441\u0441\u044B" },
+    or: { c: "#F08C00", name: "\u0410\u043C\u0435\u0440\u0438\u043A\u0438" },
+    rd: { c: "#E10600", name: "\u0415\u0432\u0440\u043E\u043F\u0430: \u043A\u043B\u0430\u0441\u0441\u0438\u043A\u0430" },
+    yl: { c: "#FFD43B", name: "\u0415\u0432\u0440\u043E\u043F\u0430: \u0445\u043E\u043B\u043C\u044B" },
+    gr: { c: "#2F9E44", name: "\u041B\u0435\u0433\u0435\u043D\u0434\u044B" },
+    bl: { c: "#1971C2", name: "\u0416\u0435\u043C\u0447\u0443\u0436\u0438\u043D\u044B" }
+  };
+  const CELLS = [
+    { t: "start", name: "\u0421\u0422\u0410\u0420\u0422", e: "\u{1F3C1}" },
+    { t: "prop", name: "\u0410\u043B\u044C\u0431\u0435\u0440\u0442-\u041F\u0430\u0440\u043A", g: "br", price: 60, e: "\u{1F1E6}\u{1F1FA}" },
+    { t: "chest", name: "\u0421\u0442\u044E\u0430\u0440\u0434\u044B FIA", e: "\u{1F4CB}" },
+    { t: "prop", name: "\u0428\u0430\u043D\u0445\u0430\u0439", g: "br", price: 60, e: "\u{1F1E8}\u{1F1F3}" },
+    { t: "tax", name: "\u0428\u0442\u0440\u0430\u0444 FIA", amount: 200, e: "\u{1F4B8}" },
+    { t: "team", name: "Ferrari", price: 200, e: "\u{1F3CE}\uFE0F", tc: "#E10600" },
+    { t: "prop", name: "\u0411\u0430\u0445\u0440\u0435\u0439\u043D", g: "lb", price: 100, e: "\u{1F1E7}\u{1F1ED}" },
+    { t: "chance", name: "\u0421\u0435\u0439\u0444\u0442\u0438-\u043A\u0430\u0440", e: "\u{1F6A8}" },
+    { t: "prop", name: "\u0414\u0436\u0438\u0434\u0434\u0430", g: "lb", price: 100, e: "\u{1F1F8}\u{1F1E6}" },
+    { t: "prop", name: "\u041B\u0443\u0441\u0430\u0438\u043B", g: "lb", price: 120, e: "\u{1F1F6}\u{1F1E6}" },
+    { t: "jail", name: "\u041F\u0438\u0442-\u043B\u0435\u0439\u043D", e: "\u{1F527}" },
+    { t: "prop", name: "\u0411\u0430\u043A\u0443", g: "pk", price: 140, e: "\u{1F1E6}\u{1F1FF}" },
+    { t: "util", name: "Pirelli", price: 150, e: "\u{1F6DE}" },
+    { t: "prop", name: "\u0421\u0438\u043D\u0433\u0430\u043F\u0443\u0440", g: "pk", price: 140, e: "\u{1F1F8}\u{1F1EC}" },
+    { t: "prop", name: "\u0421\u0443\u0437\u0443\u043A\u0430", g: "pk", price: 160, e: "\u{1F1EF}\u{1F1F5}" },
+    { t: "team", name: "Mercedes", price: 200, e: "\u{1F3CE}\uFE0F", tc: "#27F4D2" },
+    { t: "prop", name: "\u041E\u0441\u0442\u0438\u043D", g: "or", price: 180, e: "\u{1F1FA}\u{1F1F8}" },
+    { t: "chest", name: "\u0421\u0442\u044E\u0430\u0440\u0434\u044B FIA", e: "\u{1F4CB}" },
+    { t: "prop", name: "\u041C\u0435\u0445\u0438\u043A\u043E", g: "or", price: 180, e: "\u{1F1F2}\u{1F1FD}" },
+    { t: "prop", name: "\u0418\u043D\u0442\u0435\u0440\u043B\u0430\u0433\u043E\u0441", g: "or", price: 200, e: "\u{1F1E7}\u{1F1F7}" },
+    { t: "parking", name: "\u041F\u043E\u0434\u0438\u0443\u043C", e: "\u{1F3C6}" },
+    { t: "prop", name: "\u0411\u0430\u0440\u0441\u0435\u043B\u043E\u043D\u0430", g: "rd", price: 220, e: "\u{1F1EA}\u{1F1F8}" },
+    { t: "chance", name: "\u0421\u0435\u0439\u0444\u0442\u0438-\u043A\u0430\u0440", e: "\u{1F6A8}" },
+    { t: "prop", name: "\u0421\u043F\u0430", g: "rd", price: 220, e: "\u{1F1E7}\u{1F1EA}" },
+    { t: "prop", name: "\u0417\u0430\u043D\u0434\u0432\u043E\u0440\u0442", g: "rd", price: 240, e: "\u{1F1F3}\u{1F1F1}" },
+    { t: "team", name: "Red Bull", price: 200, e: "\u{1F3CE}\uFE0F", tc: "#3671C6" },
+    { t: "prop", name: "\u0425\u0443\u043D\u0433\u0430\u0440\u043E\u0440\u0438\u043D\u0433", g: "yl", price: 260, e: "\u{1F1ED}\u{1F1FA}" },
+    { t: "prop", name: "\u0420\u0435\u0434 \u0411\u0443\u043B\u043B \u0420\u0438\u043D\u0433", g: "yl", price: 260, e: "\u{1F1E6}\u{1F1F9}" },
+    { t: "util", name: "DRS", price: 150, e: "\u{1F4A8}" },
+    { t: "prop", name: "\u0418\u043C\u043E\u043B\u0430", g: "yl", price: 280, e: "\u{1F1EE}\u{1F1F9}" },
+    { t: "gotojail", name: "\u0410\u0432\u0430\u0440\u0438\u044F!", e: "\u{1F4A5}" },
+    { t: "prop", name: "\u0421\u0438\u043B\u044C\u0432\u0435\u0440\u0441\u0442\u043E\u0443\u043D", g: "gr", price: 300, e: "\u{1F1EC}\u{1F1E7}" },
+    { t: "prop", name: "\u041C\u043E\u043D\u0446\u0430", g: "gr", price: 300, e: "\u{1F1EE}\u{1F1F9}" },
+    { t: "chest", name: "\u0421\u0442\u044E\u0430\u0440\u0434\u044B FIA", e: "\u{1F4CB}" },
+    { t: "prop", name: "\u041B\u0430\u0441-\u0412\u0435\u0433\u0430\u0441", g: "gr", price: 320, e: "\u{1F3B0}" },
+    { t: "team", name: "McLaren", price: 200, e: "\u{1F3CE}\uFE0F", tc: "#FF8000" },
+    { t: "chance", name: "\u0421\u0435\u0439\u0444\u0442\u0438-\u043A\u0430\u0440", e: "\u{1F6A8}" },
+    { t: "prop", name: "\u041C\u043E\u043D\u0430\u043A\u043E", g: "bl", price: 350, e: "\u{1F1F2}\u{1F1E8}" },
+    { t: "tax", name: "\u041A\u044D\u043F \u0431\u044E\u0434\u0436\u0435\u0442\u0430", amount: 100, e: "\u{1F4B8}" },
+    { t: "prop", name: "\u0410\u0431\u0443-\u0414\u0430\u0431\u0438", g: "bl", price: 400, e: "\u{1F1E6}\u{1F1EA}" }
+  ];
+  const CHANCE = [
+    { txt: "\u0421\u0435\u0439\u0444\u0442\u0438-\u043A\u0430\u0440! \u041F\u0435\u043B\u043E\u0442\u043E\u043D \u0441\u043E\u0431\u0440\u0430\u043B\u0441\u044F \u0437\u0430 \u0432\u0430\u043C\u0438. \u041F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 50 \u041C$", m: 50 },
+    { txt: "\u0421\u0440\u0435\u0437\u0430\u043B\u0438 \u0448\u0438\u043A\u0430\u043D\u0443 \u2014 \u0448\u0442\u0440\u0430\u0444 15 \u041C$", m: -15 },
+    { txt: "\u0411\u044B\u0441\u0442\u0440\u0435\u0439\u0448\u0438\u0439 \u043A\u0440\u0443\u0433 \u0433\u043E\u043D\u043A\u0438! \u0411\u043E\u043D\u0443\u0441 100 \u041C$", m: 100 },
+    { txt: "\u0410\u0432\u0430\u0440\u0438\u044F \u043D\u0430 \u0432\u044B\u0445\u043E\u0434\u0435 \u0438\u0437 \u043F\u043E\u0432\u043E\u0440\u043E\u0442\u0430 \u2014 \u043D\u0430 \u041F\u0438\u0442-\u043B\u0435\u0439\u043D!", jail: true },
+    { txt: "\u0422\u0435\u043B\u0435\u043F\u043E\u0440\u0442 \u043D\u0430 \u0421\u0422\u0410\u0420\u0422 \u2014 \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 200 \u041C$", go: 0 },
+    { txt: "\u0423\u0438\u043A-\u044D\u043D\u0434 \u0432 \u043A\u043D\u044F\u0436\u0435\u0441\u0442\u0432\u0435: \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u044F\u0439\u0442\u0435\u0441\u044C \u0432 \u041C\u043E\u043D\u0430\u043A\u043E", go: 37 },
+    { txt: "\u041F\u0440\u0435\u0432\u044B\u0448\u0435\u043D\u0438\u0435 \u043B\u0438\u043C\u0438\u0442\u043E\u0432 \u0442\u0440\u0430\u0441\u0441\u044B \u2014 \u0437\u0430\u043F\u043B\u0430\u0442\u0438\u0442\u0435 \u043A\u0430\u0436\u0434\u043E\u043C\u0443 \u043F\u043E 20 \u041C$", each: -20 },
+    { txt: "\u041D\u043E\u0432\u044B\u0439 \u0442\u0438\u0442\u0443\u043B\u044C\u043D\u044B\u0439 \u0441\u043F\u043E\u043D\u0441\u043E\u0440: +150 \u041C$", m: 150 },
+    { txt: "\u0417\u0430\u043C\u0435\u043D\u0430 \u0441\u0438\u043B\u043E\u0432\u043E\u0439 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438: -100 \u041C$", m: -100 },
+    { txt: "\u041E\u0442\u043A\u0430\u0442 \u043D\u0430 3 \u043A\u043B\u0435\u0442\u043A\u0438 \u043D\u0430\u0437\u0430\u0434", back: 3 },
+    { txt: "\u0412\u044B\u0445\u043E\u0434 \u0441 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0430 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E \u2014 \u043A\u0430\u0440\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0443 \u0432\u0430\u0441", gojf: true },
+    { txt: "\u0415\u0434\u044C\u0442\u0435 \u043A \u0431\u043B\u0438\u0436\u0430\u0439\u0448\u0435\u0439 \u043A\u043E\u043C\u0430\u043D\u0434\u0435. \u0415\u0441\u043B\u0438 \u043E\u043D\u0430 \u0437\u0430\u043D\u044F\u0442\u0430 \u2014 \u0434\u0432\u043E\u0439\u043D\u0430\u044F \u0430\u0440\u0435\u043D\u0434\u0430 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0443", nearest: "team" },
+    { txt: "\u0415\u0434\u044C\u0442\u0435 \u043A \u0431\u043B\u0438\u0436\u0430\u0439\u0448\u0435\u043C\u0443 \u043F\u043E\u0441\u0442\u0430\u0432\u0449\u0438\u043A\u0443 (Pirelli/DRS). \u0415\u0441\u043B\u0438 \u0437\u0430\u043D\u044F\u0442 \u2014 \u0437\u0430\u043F\u043B\u0430\u0442\u0438\u0442\u0435 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0443 10\xD7 \u043D\u043E\u0432\u043E\u0433\u043E \u0431\u0440\u043E\u0441\u043A\u0430", nearest: "util" },
+    { txt: "\u0420\u0435\u043C\u043E\u043D\u0442 \u0431\u043E\u043B\u0438\u0434\u0430: 25 \u041C$ \u0437\u0430 \u043A\u0430\u0436\u0434\u044B\u0439 \u0430\u043F\u0433\u0440\u0435\u0439\u0434, 100 \u041C$ \u0437\u0430 \u0441\u0442\u0430\u0442\u0443\u0441 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438", repair: [25, 100] }
+  ];
+  const CHEST = [
+    { txt: "\u041F\u0440\u043E\u0442\u0435\u0441\u0442 \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D, \u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u0432 \u0432\u0430\u0448\u0443 \u043F\u043E\u043B\u044C\u0437\u0443: +100 \u041C$", m: 100 },
+    { txt: "\u0428\u0442\u0440\u0430\u0444 5 \u0441\u0435\u043A\u0443\u043D\u0434... \u0438 50 \u041C$", m: -50 },
+    { txt: "\u041F\u0440\u0438\u0437\u043E\u0432\u044B\u0435 \u0437\u0430 \u043F\u043E\u0434\u0438\u0443\u043C: +120 \u041C$", m: 120 },
+    { txt: "\u0412\u0441\u0435 \u0435\u0434\u0443\u0442 \u0432 \u0432\u0430\u0448\u0435\u043C \u0441\u043B\u0438\u043F\u0441\u0442\u0440\u0438\u043C\u0435 \u2014 \u043A\u0430\u0436\u0434\u044B\u0439 \u043F\u043B\u0430\u0442\u0438\u0442 \u0432\u0430\u043C 25 \u041C$", each: 25 },
+    { txt: "\u0421\u0431\u043E\u0440 \u0437\u0430 \u0437\u0430\u043A\u0440\u044B\u0442\u044B\u0439 \u043F\u0430\u0440\u043A: -40 \u041C$", m: -40 },
+    { txt: "\u0411\u043E\u043D\u0443\u0441 \u043E\u0442 Liberty Media: +200 \u041C$", m: 200 },
+    { txt: "\u041E\u0442\u043A\u0430\u0437 \u043A\u043E\u0440\u043E\u0431\u043A\u0438 \u043F\u0435\u0440\u0435\u0434\u0430\u0447: -75 \u041C$", m: -75 },
+    { txt: "\u0412\u0430\u0441 \u0437\u043E\u0432\u0443\u0442 \u043D\u0430 \u041F\u043E\u0434\u0438\u0443\u043C \u2014 \u043F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u0435\u0441\u044C \u043D\u0430 \u043A\u043B\u0435\u0442\u043A\u0443 \u{1F3C6}", go: 20 },
+    { txt: "\u0413\u0440\u0438\u0434-\u043F\u0435\u043D\u0430\u043B\u044C\u0442\u0438: \u043D\u0430 \u041F\u0438\u0442-\u043B\u0435\u0439\u043D!", jail: true },
+    { txt: "\u0410\u0443\u0434\u0438\u0442 \u043D\u0430\u0448\u0451\u043B \u0440\u0435\u0437\u0435\u0440\u0432 \u0431\u044E\u0434\u0436\u0435\u0442\u0430: +60 \u041C$", m: 60 },
+    { txt: "\u0412\u044B\u0445\u043E\u0434 \u0441 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0430 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E \u2014 \u043A\u0430\u0440\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0443 \u0432\u0430\u0441", gojf: true },
+    { txt: "\u041E\u0431\u0441\u043B\u0443\u0436\u0438\u0432\u0430\u043D\u0438\u0435 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B: 40 \u041C$ \u0437\u0430 \u043A\u0430\u0436\u0434\u044B\u0439 \u0430\u043F\u0433\u0440\u0435\u0439\u0434, 115 \u041C$ \u0437\u0430 \u0441\u0442\u0430\u0442\u0443\u0441 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438", repair: [40, 115] }
+  ];
+  const GOJF_CHANCE_IDX = CHANCE.findIndex((c) => c.gojf);
+  const GOJF_CHEST_IDX = CHEST.findIndex((c) => c.gojf);
+  const PLAYER_COLORS = ["#E10600", "#27F4D2", "#FF8000", "#3671C6", "#B6BABD", "#52E252"];
+  const PLAYER_ICONS = ["\u{1F534}", "\u{1FA75}", "\u{1F7E0}", "\u{1F535}", "\u26AA", "\u{1F7E2}"];
+  const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
+  let soundOn = true;
+  try {
+    soundOn = localStorage.getItem("f1mono-sound") !== "0";
+  } catch {
+  }
+  let audioCtx = null;
+  function tone(freq, dur, type = "square", delay = 0, vol = 0.14) {
+    if (!soundOn) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const t = audioCtx.currentTime + delay;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(1e-3, t + dur);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    } catch {
+    }
+  }
+  const SFX = {
+    dice: () => {
+      for (let i = 0; i < 7; i++) tone(180 + Math.random() * 420, 0.045, "square", i * 0.075, 0.07);
+    },
+    turn: () => {
+      tone(880, 0.12, "sine");
+      tone(1318, 0.2, "sine", 0.13);
+    },
+    buy: () => {
+      tone(659, 0.1, "triangle");
+      tone(988, 0.16, "triangle", 0.1);
+    },
+    pay: () => {
+      tone(440, 0.12, "sawtooth", 0, 0.07);
+      tone(311, 0.2, "sawtooth", 0.12, 0.07);
+    },
+    card: () => {
+      tone(523, 0.07, "sine");
+      tone(784, 0.1, "sine", 0.08);
+    },
+    crash: () => {
+      tone(130, 0.35, "sawtooth", 0, 0.18);
+      tone(82, 0.5, "sawtooth", 0.06, 0.14);
+    },
+    build: () => {
+      tone(700, 0.06, "square", 0, 0.1);
+      tone(932, 0.07, "square", 0.08, 0.1);
+    },
+    auction: () => {
+      tone(600, 0.07, "square", 0, 0.1);
+      tone(600, 0.07, "square", 0.13, 0.1);
+      tone(740, 0.14, "square", 0.26, 0.12);
+    },
+    cash: () => {
+      tone(1175, 0.07, "sine");
+      tone(1568, 0.12, "sine", 0.08);
+    },
+    win: () => {
+      [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.28, "triangle", i * 0.16, 0.16));
+    }
+  };
+  const START_MONEY = 1500;
+  const GO_MONEY = 200;
+  const JAIL_FEE = 50;
+  const rentTable = (price) => {
+    const b = Math.round(price / 10);
+    return [b, b * 5, b * 12, b * 25, b * 35, b * 45];
+  };
+  const upCost = (price) => Math.round(price / 2 / 10) * 10;
+  const TEAM_RENT = [25, 50, 100, 200];
+  const sb = window.__f1sb;
+  function normalize(s) {
+    if (!s) return s;
+    if (Array.isArray(s.owners)) {
+      const o = {};
+      s.owners.forEach((v, i) => {
+        if (v) o[i] = v;
+      });
+      s.owners = o;
+    }
+    s.owners = s.owners || {};
+    s.log = s.log || [];
+    s.players = s.players || [];
+    for (const p of s.players) p.gojf = p.gojf || [];
+    if (s.pending && s.pending.type === "auction") {
+      s.pending.bids = s.pending.bids || {};
+      s.pending.queue = s.pending.queue || [];
+    }
+    if (s.trade) {
+      s.trade.giveProps = s.trade.giveProps || [];
+      s.trade.getProps = s.trade.getProps || [];
+    }
+    return s;
+  }
+  async function dbGetRoom(code) {
+    try {
+      const { data } = await sb.from("rooms").select("state").eq("code", code).maybeSingle();
+      return data ? normalize(data.state) : null;
+    } catch {
+      return null;
+    }
+  }
+  const lastGet = () => {
+    try {
+      return JSON.parse(localStorage.getItem("f1mono-last"));
+    } catch {
+      return null;
+    }
+  };
+  const lastSet = (v) => {
+    try {
+      localStorage.setItem("f1mono-last", JSON.stringify(v));
+    } catch {
+    }
+  };
+  function addLog(st, msg) {
+    st.log.unshift(msg);
+    if (st.log.length > 40) st.log.length = 40;
+  }
+  function alivePlayers(st) {
+    return st.players.filter((p) => !p.bankrupt);
+  }
+  function ownsFullGroup(st, pid, g) {
+    return CELLS.every((c, i) => c.g !== g || st.owners[i] && st.owners[i].pid === pid);
+  }
+  function teamCount(st, pid) {
+    return Object.keys(st.owners).filter((i) => CELLS[i].t === "team" && st.owners[i].pid === pid).length;
+  }
+  function utilCount(st, pid) {
+    return Object.keys(st.owners).filter((i) => CELLS[i].t === "util" && st.owners[i].pid === pid).length;
+  }
+  const potOn = (st) => st.rules ? !!st.rules.pot : true;
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function ensureDecks(st) {
+    if (!st.decks) st.decks = { chance: shuffle(CHANCE.map((_, i) => i)), chest: shuffle(CHEST.map((_, i) => i)) };
+  }
+  function drawCard(st, deck) {
+    ensureDecks(st);
+    const arr = st.decks[deck];
+    const idx = arr.shift();
+    const card = (deck === "chance" ? CHANCE : CHEST)[idx];
+    if (!card.gojf) arr.push(idx);
+    return card;
+  }
+  const HOUSES_TOTAL = 32;
+  const HOTELS_TOTAL = 12;
+  function housesUsed(st) {
+    let n = 0;
+    for (const o of Object.values(st.owners)) if (o.lvl > 0 && o.lvl < 5) n += o.lvl;
+    return n;
+  }
+  function hotelsUsed(st) {
+    let n = 0;
+    for (const o of Object.values(st.owners)) if (o.lvl === 5) n++;
+    return n;
+  }
+  function groupLevels(st, g) {
+    const out = [];
+    CELLS.forEach((c, i) => {
+      if (c.g === g) out.push(st.owners[i] ? st.owners[i].lvl : 0);
+    });
+    return out;
+  }
+  function groupHasMortgage(st, g) {
+    return CELLS.some((c, i) => c.g === g && st.owners[i] && st.owners[i].mort);
+  }
+  function groupHasBuildings(st, g) {
+    return CELLS.some((c, i) => c.g === g && st.owners[i] && st.owners[i].lvl > 0);
+  }
+  function canBuildAt(st, pid, pos) {
+    const cell = CELLS[pos];
+    const o = st.owners[pos];
+    if (!o || o.pid !== pid || cell.t !== "prop" || o.lvl >= 5 || o.mort) return { ok: false };
+    if (!ownsFullGroup(st, pid, cell.g)) return { ok: false, why: "\u0414\u043B\u044F \u0437\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043D\u0443\u0436\u043D\u0430 \u0432\u0441\u044F \u0433\u0440\u0443\u043F\u043F\u0430" };
+    if (groupHasMortgage(st, cell.g)) return { ok: false, why: "\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u043A\u0443\u043F\u0438\u0442\u0435 \u0437\u0430\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0435 \u0442\u0440\u0430\u0441\u0441\u044B \u0433\u0440\u0443\u043F\u043F\u044B" };
+    const lv = groupLevels(st, cell.g);
+    if (o.lvl !== Math.min(...lv)) return { ok: false, why: "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0440\u0430\u0432\u043D\u043E\u043C\u0435\u0440\u043D\u043E\u0439 \u0437\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u0443\u043B\u0443\u0447\u0448\u0438\u0442\u0435 \u043E\u0442\u0441\u0442\u0430\u044E\u0449\u0438\u0435 \u0442\u0440\u0430\u0441\u0441\u044B \u0433\u0440\u0443\u043F\u043F\u044B" };
+    if (o.lvl < 4 && housesUsed(st) >= HOUSES_TOTAL) return { ok: false, why: "\u0412 \u0431\u0430\u043D\u043A\u0435 \u0437\u0430\u043A\u043E\u043D\u0447\u0438\u043B\u0438\u0441\u044C \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B (32/32)" };
+    if (o.lvl === 4 && hotelsUsed(st) >= HOTELS_TOTAL) return { ok: false, why: "\u0412 \u0431\u0430\u043D\u043A\u0435 \u0437\u0430\u043A\u043E\u043D\u0447\u0438\u043B\u0438\u0441\u044C \u0441\u0442\u0430\u0442\u0443\u0441\u044B \u0413\u0440\u0430\u043D-\u043F\u0440\u0438 (12/12)" };
+    return { ok: true };
+  }
+  function canSellUpAt(st, pid, pos) {
+    const o = st.owners[pos];
+    if (!o || o.pid !== pid || o.lvl === 0) return { ok: false };
+    const lv = groupLevels(st, CELLS[pos].g);
+    if (o.lvl !== Math.max(...lv)) return { ok: false, why: "\u0421\u043D\u0438\u043C\u0430\u0439\u0442\u0435 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0440\u0430\u0432\u043D\u043E\u043C\u0435\u0440\u043D\u043E: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u0441 \u0441\u0430\u043C\u044B\u0445 \u0437\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0445" };
+    if (o.lvl === 5 && HOUSES_TOTAL - housesUsed(st) < 4) return { ok: false, why: "\u0412 \u0431\u0430\u043D\u043A\u0435 \u043D\u0435\u0442 4 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u043E\u0432, \u0447\u0442\u043E\u0431\u044B \u0440\u0430\u0437\u043C\u0435\u043D\u044F\u0442\u044C \u0441\u0442\u0430\u0442\u0443\u0441 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438" };
+    return { ok: true };
+  }
+  function calcRent(st, pos, diceSum) {
+    const cell = CELLS[pos];
+    const o = st.owners[pos];
+    if (!o) return 0;
+    if (o.mort) return 0;
+    if (cell.t === "prop") {
+      const rents = rentTable(cell.price);
+      if (o.lvl === 0) return ownsFullGroup(st, o.pid, cell.g) ? rents[0] * 2 : rents[0];
+      return rents[o.lvl];
+    }
+    if (cell.t === "team") return TEAM_RENT[teamCount(st, o.pid) - 1];
+    if (cell.t === "util") return (utilCount(st, o.pid) === 2 ? 10 : 4) * diceSum;
+    return 0;
+  }
+  function pay(st, p, amount, toPid) {
+    p.money -= amount;
+    if (toPid === "pot") {
+      st.pot = (st.pot || 0) + amount;
+    } else if (toPid && toPid !== "bank") {
+      const to = st.players.find((x) => x.id === toPid);
+      if (to) to.money += amount;
+    }
+    if (p.money < 0) p.debtTo = toPid || "bank";
+  }
+  function sendToPit(st, p) {
+    p.pos = 10;
+    p.inJail = true;
+    p.jailTurns = 0;
+    st.rolled = true;
+    st.doubles = 0;
+    addLog(st, `\u{1F4A5} ${p.name} \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u043D\u0430 \u041F\u0438\u0442-\u043B\u0435\u0439\u043D`);
+  }
+  function applyCard(st, p, card, deckName, deck) {
+    addLog(st, `${deckName} \u2192 ${p.name}: ${card.txt}`);
+    if (card.gojf) {
+      p.gojf = p.gojf || [];
+      p.gojf.push(deck);
+    } else if (card.repair) {
+      let cost = 0;
+      for (const o of Object.values(st.owners)) {
+        if (o.pid === p.id) cost += o.lvl === 5 ? card.repair[1] : o.lvl * card.repair[0];
+      }
+      if (cost > 0) {
+        pay(st, p, cost, "bank");
+        addLog(st, `\u{1F527} ${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \u0437\u0430 \u0440\u0430\u0431\u043E\u0442\u044B: ${cost} \u041C$`);
+      }
+    } else if (card.nearest) {
+      let pos = p.pos;
+      do {
+        pos = (pos + 1) % 40;
+      } while (CELLS[pos].t !== card.nearest);
+      if (pos < p.pos) {
+        p.money += GO_MONEY;
+        addLog(st, `\u{1F3C1} ${p.name} \u043F\u0435\u0440\u0435\u0441\u0435\u043A\u0430\u0435\u0442 \u0421\u0422\u0410\u0420\u0422: +${GO_MONEY} \u041C$`);
+      }
+      p.pos = pos;
+      const o = st.owners[pos];
+      if (!o) {
+        st.pending = { type: "buy", pos };
+      } else if (o.pid !== p.id && !o.mort) {
+        const owner = st.players.find((x) => x.id === o.pid);
+        if (card.nearest === "team") {
+          const rent = calcRent(st, pos, 0) * 2;
+          pay(st, p, rent, o.pid);
+          addLog(st, `${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \u0434\u0432\u043E\u0439\u043D\u0443\u044E \u0430\u0440\u0435\u043D\u0434\u0443 ${rent} \u041C$ \u2192 ${owner ? owner.name : "?"}`);
+        } else {
+          const roll = 2 + Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6);
+          const rent = roll * 10;
+          pay(st, p, rent, o.pid);
+          addLog(st, `\u{1F3B2} \u0411\u0440\u043E\u0441\u043E\u043A ${roll}: ${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 ${rent} \u041C$ \u2192 ${owner ? owner.name : "?"}`);
+        }
+      }
+    } else if (card.m != null) {
+      if (card.m >= 0) p.money += card.m;
+      else pay(st, p, -card.m, "bank");
+    } else if (card.each != null) {
+      for (const q of alivePlayers(st)) {
+        if (q.id === p.id) continue;
+        if (card.each > 0) pay(st, q, card.each, p.id);
+        else pay(st, p, -card.each, q.id);
+      }
+    } else if (card.jail) {
+      sendToPit(st, p);
+    } else if (card.go != null) {
+      if (card.go === 0 || card.go < p.pos) p.money += GO_MONEY;
+      p.pos = card.go;
+      landOn(st, p, 7);
+    } else if (card.back != null) {
+      p.pos = (p.pos - card.back + 40) % 40;
+      landOn(st, p, 7);
+    }
+  }
+  function landOn(st, p, diceSum) {
+    const cell = CELLS[p.pos];
+    switch (cell.t) {
+      case "prop":
+      case "team":
+      case "util": {
+        const o = st.owners[p.pos];
+        if (!o) {
+          st.pending = { type: "buy", pos: p.pos };
+        } else if (o.pid !== p.id) {
+          if (o.mort) {
+            addLog(st, `\xAB${cell.name}\xBB \u0432 \u0437\u0430\u043B\u043E\u0433\u0435 \u2014 \u0430\u0440\u0435\u043D\u0434\u0430 \u043D\u0435 \u0432\u0437\u0438\u043C\u0430\u0435\u0442\u0441\u044F`);
+          } else {
+            const rent = calcRent(st, p.pos, diceSum);
+            const owner = st.players.find((x) => x.id === o.pid);
+            pay(st, p, rent, o.pid);
+            addLog(st, `${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \u0430\u0440\u0435\u043D\u0434\u0443 ${rent} \u041C$ \u2192 ${owner ? owner.name : "?"} (\xAB${cell.name}\xBB)`);
+          }
+        }
+        break;
+      }
+      case "tax":
+        pay(st, p, cell.amount, potOn(st) ? "pot" : "bank");
+        addLog(st, `${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \xAB${cell.name}\xBB: ${cell.amount} \u041C$`);
+        break;
+      case "chance":
+        applyCard(st, p, drawCard(st, "chance"), "\u{1F6A8} \u0421\u0435\u0439\u0444\u0442\u0438-\u043A\u0430\u0440", "chance");
+        break;
+      case "chest":
+        applyCard(st, p, drawCard(st, "chest"), "\u{1F4CB} \u0421\u0442\u044E\u0430\u0440\u0434\u044B", "chest");
+        break;
+      case "gotojail":
+        sendToPit(st, p);
+        break;
+      case "parking":
+        if ((st.pot || 0) > 0) {
+          p.money += st.pot;
+          addLog(st, `\u{1F3C6} ${p.name} \u0437\u0430\u0431\u0438\u0440\u0430\u0435\u0442 \u0431\u0430\u043D\u043A \u041F\u043E\u0434\u0438\u0443\u043C\u0430: +${st.pot} \u041C$!`);
+          st.pot = 0;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  function doRoll(st) {
+    const p = st.players[st.turn];
+    const d1 = 1 + Math.floor(Math.random() * 6);
+    const d2 = 1 + Math.floor(Math.random() * 6);
+    st.dice = [d1, d2];
+    const sum = d1 + d2;
+    if (p.inJail) {
+      if (d1 === d2) {
+        p.inJail = false;
+        p.jailTurns = 0;
+        addLog(st, `\u{1F3B2} ${p.name} \u0432\u044B\u0431\u0440\u043E\u0441\u0438\u043B \u0434\u0443\u0431\u043B\u044C ${d1}:${d2} \u0438 \u043F\u043E\u043A\u0438\u0434\u0430\u0435\u0442 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D!`);
+        movePlayer(st, p, sum);
+        st.rolled = true;
+      } else {
+        p.jailTurns += 1;
+        if (p.jailTurns >= 3) {
+          pay(st, p, JAIL_FEE, potOn(st) ? "pot" : "bank");
+          p.inJail = false;
+          p.jailTurns = 0;
+          addLog(st, `\u{1F527} ${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \u043C\u0435\u0445\u0430\u043D\u0438\u043A\u0430\u043C ${JAIL_FEE} \u041C$ \u0438 \u0432\u044B\u0435\u0437\u0436\u0430\u0435\u0442`);
+          movePlayer(st, p, sum);
+        } else {
+          addLog(st, `\u{1F3B2} ${p.name}: ${d1}:${d2} \u2014 \u043C\u0430\u0448\u0438\u043D\u0430 \u0435\u0449\u0451 \u0432 \u0440\u0435\u043C\u043E\u043D\u0442\u0435 (${p.jailTurns}/3)`);
+        }
+        st.rolled = true;
+      }
+      st.doubles = 0;
+      return;
+    }
+    addLog(st, `\u{1F3B2} ${p.name} \u0431\u0440\u043E\u0441\u0430\u0435\u0442: ${d1} + ${d2} = ${sum}`);
+    if (d1 === d2) {
+      st.doubles += 1;
+      if (st.doubles >= 3) {
+        addLog(st, `\u{1F6A8} \u0422\u0440\u0438 \u0434\u0443\u0431\u043B\u044F \u043F\u043E\u0434\u0440\u044F\u0434! \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B\u0439 \u043F\u0438\u043B\u043E\u0442\u0430\u0436`);
+        sendToPit(st, p);
+        return;
+      }
+    }
+    movePlayer(st, p, sum);
+    st.rolled = d1 !== d2;
+    if (d1 === d2 && !p.inJail) addLog(st, `\u{1F501} \u0414\u0443\u0431\u043B\u044C! ${p.name} \u0431\u0440\u043E\u0441\u0430\u0435\u0442 \u0435\u0449\u0451 \u0440\u0430\u0437`);
+  }
+  function movePlayer(st, p, steps) {
+    const np = (p.pos + steps) % 40;
+    if (np < p.pos) {
+      p.money += GO_MONEY;
+      addLog(st, `\u{1F3C1} ${p.name} \u043F\u0435\u0440\u0435\u0441\u0435\u043A\u0430\u0435\u0442 \u0421\u0422\u0410\u0420\u0422: +${GO_MONEY} \u041C$`);
+    }
+    p.pos = np;
+    landOn(st, p, steps);
+  }
+  function nextTurn(st) {
+    st.dice = null;
+    st.doubles = 0;
+    st.rolled = false;
+    st.pending = null;
+    let n = st.turn;
+    for (let i = 0; i < st.players.length; i++) {
+      n = (n + 1) % st.players.length;
+      if (!st.players[n].bankrupt) break;
+    }
+    st.turn = n;
+    addLog(st, `\u25B6\uFE0F \u0425\u043E\u0434: ${st.players[n].name}`);
+  }
+  function declareBankrupt(st, p) {
+    const creditor = p.debtTo && p.debtTo !== "bank" ? st.players.find((x) => x.id === p.debtTo) : null;
+    const myProps = Object.keys(st.owners).filter((i) => st.owners[i].pid === p.id).map(Number);
+    for (const i of myProps) {
+      const o = st.owners[i];
+      if (o.lvl > 0) {
+        p.money += o.lvl * Math.round(upCost(CELLS[i].price) / 2);
+        o.lvl = 0;
+      }
+    }
+    const auctionAll = !!(st.rules && st.rules.bankAuction);
+    const aliveCreditor = creditor && !creditor.bankrupt ? creditor : null;
+    if (aliveCreditor && !auctionAll) {
+      let interest = 0;
+      for (const i of myProps) {
+        st.owners[i].pid = aliveCreditor.id;
+        if (st.owners[i].mort) interest += Math.round(CELLS[i].price * 0.05);
+      }
+      if (p.money > 0) aliveCreditor.money += p.money;
+      if (interest > 0) {
+        pay(st, aliveCreditor, interest, "bank");
+        addLog(st, `\u{1F3E6} ${aliveCreditor.name} \u043F\u043B\u0430\u0442\u0438\u0442 10% \u043F\u043E \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043D\u044B\u043C \u0437\u0430\u043B\u043E\u0433\u0430\u043C: ${interest} \u041C$`);
+      }
+    } else {
+      if (aliveCreditor && p.money > 0) {
+        aliveCreditor.money += p.money;
+        addLog(st, `\u{1F4B0} \u041E\u0441\u0442\u0430\u0442\u043E\u043A \u0434\u0435\u043D\u0435\u0433 \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 (${p.money} \u041C$) \u0443\u0445\u043E\u0434\u0438\u0442 \u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443 ${aliveCreditor.name}`);
+      }
+      for (const i of myProps) delete st.owners[i];
+    }
+    p.money = 0;
+    p.bankrupt = true;
+    p.debtTo = null;
+    addLog(st, `\u{1F3F3}\uFE0F ${p.name} \u0441\u0445\u043E\u0434\u0438\u0442 \u0441 \u0434\u0438\u0441\u0442\u0430\u043D\u0446\u0438\u0438 (\u0431\u0430\u043D\u043A\u0440\u043E\u0442)${creditor ? `, \u0430\u043A\u0442\u0438\u0432\u044B \u2192 ${creditor.name}` : ""}`);
+    const alive = alivePlayers(st);
+    if (alive.length === 1) {
+      st.phase = "over";
+      st.winner = alive[0].id;
+      addLog(st, `\u{1F3C6} \u0427\u0415\u041C\u041F\u0418\u041E\u041D: ${alive[0].name}!`);
+      return;
+    }
+    if (st.players[st.turn].id === p.id) nextTurn(st);
+    if ((auctionAll || !aliveCreditor) && myProps.length) {
+      st.pending = { type: "auction", pos: myProps[0], bids: {}, queue: myProps.slice(1) };
+      addLog(st, `\u{1F528} \u0418\u043C\u0443\u0449\u0435\u0441\u0442\u0432\u043E \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 \u0443\u0445\u043E\u0434\u0438\u0442 \u0441 \u043C\u043E\u043B\u043E\u0442\u043A\u0430. \u041F\u0435\u0440\u0432\u044B\u0439 \u043B\u043E\u0442: \xAB${CELLS[myProps[0]].name}\xBB`);
+    }
+  }
+  function tryResolveAuction(st) {
+    const a = st.pending;
+    if (!a || a.type !== "auction") return;
+    const bidders = alivePlayers(st);
+    if (!bidders.every((p) => a.bids[p.id] !== void 0)) return;
+    let winner = null;
+    let best = 0;
+    for (const p of bidders) {
+      const b = a.bids[p.id] || 0;
+      if (b > best) {
+        best = b;
+        winner = p;
+      }
+    }
+    const cell = CELLS[a.pos];
+    if (winner && best > 0) {
+      winner.money -= Math.min(best, winner.money);
+      st.owners[a.pos] = { pid: winner.id, lvl: 0 };
+      addLog(st, `\u{1F528} \u0410\u0443\u043A\u0446\u0438\u043E\u043D: \xAB${cell.name}\xBB \u0443\u0445\u043E\u0434\u0438\u0442 \u043A ${winner.name} \u0437\u0430 ${best} \u041C$`);
+    } else {
+      addLog(st, `\u{1F528} \u0410\u0443\u043A\u0446\u0438\u043E\u043D \u043F\u043E \xAB${cell.name}\xBB: \u0431\u0435\u0437 \u0441\u0442\u0430\u0432\u043E\u043A, \u0442\u0440\u0430\u0441\u0441\u0430 \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0441\u0432\u043E\u0431\u043E\u0434\u043D\u043E\u0439`);
+    }
+    const queue = a.queue || [];
+    if (queue.length) {
+      st.pending = { type: "auction", pos: queue[0], bids: {}, queue: queue.slice(1) };
+      addLog(st, `\u{1F528} \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u043B\u043E\u0442: \xAB${CELLS[queue[0]].name}\xBB`);
+    } else {
+      st.pending = null;
+    }
+  }
+  function AuctionPanel({ st, me, busy, onBid }) {
+    const [bid, setBid] = useState("");
+    const a = st.pending;
+    const cell = CELLS[a.pos];
+    const myBid = a.bids[me.id];
+    const ps = alivePlayers(st);
+    const done = myBid !== void 0;
+    return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #262B36" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 15, marginBottom: 4 } }, "\u{1F528} \u0410\u0423\u041A\u0426\u0418\u041E\u041D: ", cell.e, " ", cell.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: "#8B93A3", marginBottom: 10 } }, "\u0426\u0435\u043D\u0430 \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435: ", cell.price, " \u041C$. \u0412\u0441\u0435 \u0434\u0435\u043B\u0430\u044E\u0442 \u0442\u0430\u0439\u043D\u044B\u0435 \u0441\u0442\u0430\u0432\u043A\u0438 \u2014 \u043F\u043E\u0431\u0435\u0436\u0434\u0430\u0435\u0442 \u043D\u0430\u0438\u0431\u043E\u043B\u044C\u0448\u0430\u044F. 0 = \u043F\u0430\u0441."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 } }, ps.map((p) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { fontSize: 12.5, color: a.bids[p.id] !== void 0 ? "#52E252" : "#8B93A3" } }, a.bids[p.id] !== void 0 ? "\u2713" : "\u2026", " ", p.name))), !me.bankrupt && (done ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: "#52E252" } }, "\u0412\u0430\u0448\u0430 \u0441\u0442\u0430\u0432\u043A\u0430 \u043F\u0440\u0438\u043D\u044F\u0442\u0430. \u0416\u0434\u0451\u043C \u043E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0445...") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        className: "inp",
+        type: "number",
+        min: "0",
+        max: me.money,
+        placeholder: `\u0434\u043E ${me.money}`,
+        value: bid,
+        onChange: (e) => setBid(e.target.value),
+        style: { flex: 1 }
+      }
+    ), /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", disabled: busy, onClick: () => onBid(Math.max(0, parseInt(bid) || 0)) }, "\u0421\u0442\u0430\u0432\u043A\u0430"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => onBid(0) }, "\u041F\u0430\u0441"))));
+  }
+  function PropChip({ i, sel, mort, onTap }) {
+    const c = CELLS[i];
+    return /* @__PURE__ */ React.createElement("button", { onClick: onTap, style: {
+      padding: "6px 9px",
+      fontSize: 12,
+      borderRadius: 8,
+      cursor: "pointer",
+      color: "#fff",
+      background: sel ? "#E10600" : "#22262F",
+      border: `2px solid ${c.g ? GROUPS[c.g].c : c.tc ? c.tc : "#2C313C"}`
+    } }, mort ? "\u{1F512} " : "", c.e, " ", c.name);
+  }
+  function TradeSummary({ st, t }) {
+    const a = st.players.find((p) => p.id === t.from);
+    const b = st.players.find((p) => p.id === t.to);
+    const nm = (arr) => arr.map((i) => `${CELLS[i].e} ${CELLS[i].name}`).join(", ") || "\u2014";
+    return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 14, lineHeight: 1.7, color: "#B8BFCC" } }, /* @__PURE__ */ React.createElement("b", { style: { color: "#fff" } }, a ? a.name : "?"), " \u043E\u0442\u0434\u0430\u0451\u0442: ", nm(t.giveProps), t.giveMoney > 0 ? ` + ${t.giveMoney} \u041C$` : "", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("b", { style: { color: "#fff" } }, b ? b.name : "?"), " \u043E\u0442\u0434\u0430\u0451\u0442: ", nm(t.getProps), t.getMoney > 0 ? ` + ${t.getMoney} \u041C$` : "");
+  }
+  function TradeBuilder({ st, me, busy, onSend, onClose }) {
+    const partners = st.players.filter((p) => p.id !== me.id && !p.bankrupt);
+    const [pid, setPid] = useState(partners.length ? partners[0].id : null);
+    const [give, setGive] = useState([]);
+    const [get, setGet] = useState([]);
+    const [gm, setGm] = useState("");
+    const [km, setKm] = useState("");
+    const partner = st.players.find((p) => p.id === pid);
+    const propsOf = (id) => Object.keys(st.owners).filter((i) => st.owners[i].pid === id && st.owners[i].lvl === 0).map(Number);
+    const toggle = (arr, setArr, i) => setArr(arr.includes(i) ? arr.filter((x) => x !== i) : [...arr, i]);
+    const gMoney = Math.max(0, parseInt(gm) || 0);
+    const kMoney = Math.max(0, parseInt(km) || 0);
+    const valid = pid && (give.length > 0 || get.length > 0 || gMoney > 0 || kMoney > 0) && gMoney <= me.money && (!partner || kMoney <= partner.money);
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { className: "card fade", style: { width: "100%", maxWidth: 440, borderRadius: "18px 18px 0 0", padding: 20, maxHeight: "85vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 19, marginBottom: 12 } }, "\u{1F501} \u041E\u0431\u043C\u0435\u043D"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 } }, partners.map((p) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: p.id,
+        className: "btn",
+        style: { padding: "7px 12px", fontSize: 13, background: pid === p.id ? p.color : "#22262F", color: pid === p.id ? "#101216" : "#fff" },
+        onClick: () => {
+          setPid(p.id);
+          setGet([]);
+        }
+      },
+      p.name
+    ))), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 12, color: "#8B93A3", marginBottom: 6 } }, "\u0412\u042B \u041E\u0422\u0414\u0410\u0401\u0422\u0415"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } }, propsOf(me.id).map((i) => /* @__PURE__ */ React.createElement(PropChip, { key: i, i, sel: give.includes(i), mort: !!st.owners[i].mort, onTap: () => toggle(give, setGive, i) })), propsOf(me.id).length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: "#5A6172" } }, "\u043D\u0435\u0442 \u0441\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0445 \u0442\u0440\u0430\u0441\u0441 (\u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u043F\u0440\u043E\u0434\u0430\u0439\u0442\u0435)")), /* @__PURE__ */ React.createElement("input", { className: "inp", type: "number", min: "0", placeholder: "+ \u0434\u0435\u043D\u044C\u0433\u0438, \u041C$", value: gm, onChange: (e) => setGm(e.target.value), style: { marginBottom: 14 } }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 12, color: "#8B93A3", marginBottom: 6 } }, "\u0412\u042B \u041F\u041E\u041B\u0423\u0427\u0410\u0415\u0422\u0415"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 } }, pid && propsOf(pid).map((i) => /* @__PURE__ */ React.createElement(PropChip, { key: i, i, sel: get.includes(i), mort: !!st.owners[i].mort, onTap: () => toggle(get, setGet, i) })), pid && propsOf(pid).length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: "#5A6172" } }, "\u0443 ", partner ? partner.name : "\u043F\u0430\u0440\u0442\u043D\u0451\u0440\u0430", " \u043D\u0435\u0442 \u0441\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0445 \u0442\u0440\u0430\u0441\u0441")), /* @__PURE__ */ React.createElement("input", { className: "inp", type: "number", min: "0", placeholder: "+ \u0434\u0435\u043D\u044C\u0433\u0438, \u041C$", value: km, onChange: (e) => setKm(e.target.value) }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "btn btn-red",
+        style: { flex: 1 },
+        disabled: !valid || busy,
+        onClick: () => onSend({ from: me.id, to: pid, giveProps: give, getProps: get, giveMoney: gMoney, getMoney: kMoney })
+      },
+      "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C"
+    ), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { flex: 1 }, onClick: onClose }, "\u041E\u0442\u043C\u0435\u043D\u0430"))));
+  }
+  const genCode = () => {
+    const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    return Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join("");
+  };
+  const genId = () => Math.random().toString(36).slice(2, 10);
+  function cellRC(i) {
+    if (i <= 10) return [10, 10 - i];
+    if (i <= 20) return [10 - (i - 10), 0];
+    if (i <= 30) return [0, i - 20];
+    return [i - 30, 10];
+  }
+  function F1Monopoly() {
+    const [screen, setScreen] = useState("home");
+    const [name, setName] = useState("");
+    const [joinCode, setJoinCode] = useState("");
+    const [code, setCode] = useState(null);
+    const [myId, setMyId] = useState(null);
+    const [st, setSt] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    const [openCell, setOpenCell] = useState(null);
+    const [lastGame, setLastGame] = useState(null);
+    const [rolling, setRolling] = useState(false);
+    const [animDice, setAnimDice] = useState([1, 1]);
+    const [tradeOpen, setTradeOpen] = useState(false);
+    const [view, setView] = useState("board");
+    const [snd, setSnd] = useState(soundOn);
+    const lastLogRef = useRef(null);
+    const pollRef = useRef(null);
+    const stRef = useRef(null);
+    stRef.current = st;
+    const noDb = !sb;
+    useEffect(() => {
+      (async () => {
+        const last = lastGet();
+        if (last && last.code && last.id) {
+          const room = await dbGetRoom(last.code);
+          if (room && room.phase !== "over" && room.players.some((p) => p.id === last.id)) setLastGame(last);
+        }
+      })();
+    }, []);
+    useEffect(() => {
+      if (!code) return;
+      const ch = sb.channel("room-" + code).on("postgres_changes", { event: "*", schema: "public", table: "rooms", filter: "code=eq." + code }, (payload) => {
+        if (payload.new && payload.new.state) {
+          const s = normalize(payload.new.state);
+          if (!stRef.current || s.v !== stRef.current.v) setSt(s);
+        }
+      }).subscribe();
+      const iv = setInterval(async () => {
+        const s = await dbGetRoom(code);
+        if (s && (!stRef.current || s.v !== stRef.current.v)) setSt(s);
+      }, 3500);
+      return () => {
+        try {
+          sb.removeChannel(ch);
+        } catch {
+        }
+        clearInterval(iv);
+      };
+    }, [code]);
+    useEffect(() => {
+      if (!st || st.phase !== "playing") return;
+      const c = st.players[st.turn];
+      if (c && c.id === myId && !c.bankrupt) {
+        try {
+          if (navigator.vibrate) navigator.vibrate(120);
+        } catch {
+        }
+        SFX.turn();
+      }
+    }, [st && st.phase, st && st.turn, myId]);
+    useEffect(() => {
+      if (!st || !st.log || !st.log.length) return;
+      const top = st.log[0];
+      if (lastLogRef.current === null) {
+        lastLogRef.current = top;
+        return;
+      }
+      if (top === lastLogRef.current) return;
+      lastLogRef.current = top;
+      if (st.phase === "over") {
+        SFX.win();
+        return;
+      }
+      if (top.startsWith("\u{1F91D}")) SFX.buy();
+      else if (top.startsWith("\u{1F4A5}") || top.startsWith("\u{1F3F3}\uFE0F")) SFX.crash();
+      else if (top.startsWith("\u{1F528}")) SFX.auction();
+      else if (top.includes("\u043F\u043B\u0430\u0442\u0438\u0442 \u0430\u0440\u0435\u043D\u0434\u0443") || top.includes("\u0434\u0432\u043E\u0439\u043D\u0443\u044E \u0430\u0440\u0435\u043D\u0434\u0443") || top.includes("\u043F\u043B\u0430\u0442\u0438\u0442 \xAB")) SFX.pay();
+      else if (top.startsWith("\u{1F6A8}") || top.startsWith("\u{1F4CB}")) SFX.card();
+      else if (top.startsWith("\u{1F529}")) SFX.build();
+      else if (top.startsWith("\u{1F3C1}") || top.startsWith("\u{1F3C6}") || top.startsWith("\u{1F4B0}")) SFX.cash();
+    }, [st && st.log && st.log[0], st && st.phase]);
+    const toggleSound = () => {
+      soundOn = !soundOn;
+      try {
+        localStorage.setItem("f1mono-sound", soundOn ? "1" : "0");
+      } catch {
+      }
+      setSnd(soundOn);
+      if (soundOn) SFX.turn();
+    };
+    const mutate = useCallback(
+      async (fn) => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          for (let i = 0; i < 5; i++) {
+            const { data } = await sb.from("rooms").select("v,state").eq("code", code).maybeSingle();
+            if (!data) break;
+            const ns = normalize(JSON.parse(JSON.stringify(data.state)));
+            fn(ns);
+            const nv = (data.v || 0) + 1;
+            ns.v = nv;
+            const { data: upd } = await sb.from("rooms").update({ v: nv, state: ns }).eq("code", code).eq("v", data.v).select("v");
+            if (upd && upd.length) {
+              setSt(ns);
+              break;
+            }
+          }
+        } finally {
+          setBusy(false);
+        }
+      },
+      [code, busy]
+    );
+    const createRoom = async () => {
+      if (!name.trim()) return setErr("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u0438\u043B\u043E\u0442\u0430");
+      setBusy(true);
+      const c = genCode();
+      const id = genId();
+      const state = {
+        v: 1,
+        phase: "lobby",
+        hostId: id,
+        players: [mkPlayer(id, name.trim(), 0)],
+        owners: {},
+        turn: 0,
+        dice: null,
+        doubles: 0,
+        rolled: false,
+        pending: null,
+        winner: null,
+        pot: 0,
+        trade: null,
+        rules: { pot: false, bankAuction: false },
+        decks: null,
+        log: [`\u{1F3DF}\uFE0F \u041A\u043E\u043C\u043D\u0430\u0442\u0430 ${c} \u0441\u043E\u0437\u0434\u0430\u043D\u0430. \u0416\u0434\u0451\u043C \u043F\u0438\u043B\u043E\u0442\u043E\u0432...`]
+      };
+      const { error } = await sb.from("rooms").insert({ code: c, v: 1, state });
+      if (error) {
+        setBusy(false);
+        return setErr("\u041D\u0435\u0442 \u0441\u0432\u044F\u0437\u0438 \u0441 \u0431\u0430\u0437\u043E\u0439: " + (error.message || "\u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 URL/\u043A\u043B\u044E\u0447 Supabase \u0438 SQL-\u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443"));
+      }
+      lastSet({ code: c, id });
+      setMyId(id);
+      setCode(c);
+      setSt(state);
+      setScreen("room");
+      setBusy(false);
+    };
+    const joinRoom = async (c, existingId) => {
+      const cc = c.toUpperCase().trim();
+      if (!cc) return setErr("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 \u043A\u043E\u043C\u043D\u0430\u0442\u044B");
+      setBusy(true);
+      const room = await dbGetRoom(cc);
+      if (!room) {
+        setBusy(false);
+        return setErr("\u041A\u043E\u043C\u043D\u0430\u0442\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043E\u0434");
+      }
+      if (existingId && room.players.some((p) => p.id === existingId)) {
+        setMyId(existingId);
+        setCode(cc);
+        setSt(room);
+        setScreen("room");
+        setBusy(false);
+        return;
+      }
+      if (room.phase !== "lobby") {
+        setBusy(false);
+        return setErr("\u0413\u043E\u043D\u043A\u0430 \u0443\u0436\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C \u2014 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u044C\u0441\u044F \u043D\u0435\u043B\u044C\u0437\u044F");
+      }
+      if (room.players.length >= 6) {
+        setBusy(false);
+        return setErr("\u041A\u043E\u043C\u043D\u0430\u0442\u0430 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0430 (\u043C\u0430\u043A\u0441. 6)");
+      }
+      if (!name.trim()) {
+        setBusy(false);
+        return setErr("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u0438\u043B\u043E\u0442\u0430");
+      }
+      const id = genId();
+      let final = null;
+      for (let i = 0; i < 5; i++) {
+        const { data } = await sb.from("rooms").select("v,state").eq("code", cc).maybeSingle();
+        if (!data) break;
+        const ns = normalize(JSON.parse(JSON.stringify(data.state)));
+        if (ns.phase !== "lobby" || ns.players.length >= 6) {
+          final = ns;
+          break;
+        }
+        ns.players.push(mkPlayer(id, name.trim(), ns.players.length));
+        addLog(ns, `\u{1F44B} ${name.trim()} \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u043B\u0441\u044F`);
+        const nv = (data.v || 0) + 1;
+        ns.v = nv;
+        const { data: upd } = await sb.from("rooms").update({ v: nv, state: ns }).eq("code", cc).eq("v", data.v).select("v");
+        if (upd && upd.length) {
+          final = ns;
+          break;
+        }
+      }
+      if (!final || !final.players.some((p) => p.id === id)) {
+        setBusy(false);
+        return setErr("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u044C\u0441\u044F \u2014 \u043A\u043E\u043C\u043D\u0430\u0442\u0430 \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u0430\u043B\u0430 \u0438\u043B\u0438 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0430");
+      }
+      lastSet({ code: cc, id });
+      setMyId(id);
+      setCode(cc);
+      setSt(final);
+      setScreen("room");
+      setBusy(false);
+    };
+    const mkPlayer = (id, nm, idx) => ({
+      id,
+      name: nm,
+      color: PLAYER_COLORS[idx],
+      icon: PLAYER_ICONS[idx],
+      pos: 0,
+      money: START_MONEY,
+      inJail: false,
+      jailTurns: 0,
+      bankrupt: false,
+      debtTo: null,
+      gojf: []
+    });
+    const me = st && st.players.find((p) => p.id === myId);
+    const cur = st && st.players[st.turn];
+    const myTurn = st && st.phase === "playing" && cur && cur.id === myId && me && !me.bankrupt;
+    const actStart = () => mutate((s) => {
+      s.phase = "playing";
+      s.turn = 0;
+      ensureDecks(s);
+      addLog(s, `\u{1F6A6} \u041E\u0433\u043D\u0438 \u043F\u043E\u0433\u0430\u0441\u043B\u0438 \u2014 \u0413\u041E\u041D\u041A\u0410 \u041D\u0410\u0427\u0410\u041B\u0410\u0421\u042C! \u041F\u0435\u0440\u0432\u044B\u0439 \u0445\u043E\u0434: ${s.players[0].name}`);
+    });
+    const actTogglePot = () => mutate((s) => {
+      s.rules = { ...s.rules || {}, pot: !(s.rules && s.rules.pot) };
+    });
+    const actToggleBankAuction = () => mutate((s) => {
+      s.rules = { ...s.rules || {}, bankAuction: !(s.rules && s.rules.bankAuction) };
+    });
+    const actRoll = () => {
+      if (rolling || busy) return;
+      setRolling(true);
+      SFX.dice();
+      const iv = setInterval(() => setAnimDice([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]), 90);
+      setTimeout(() => {
+        clearInterval(iv);
+        Promise.resolve(mutate((s) => doRoll(s))).finally(() => setRolling(false));
+      }, 700);
+    };
+    const actEnd = () => mutate((s) => nextTurn(s));
+    const actBuy = () => mutate((s) => {
+      const p = s.players[s.turn];
+      const pos = s.pending.pos;
+      const cell = CELLS[pos];
+      if (p.money >= cell.price) {
+        p.money -= cell.price;
+        s.owners[pos] = { pid: p.id, lvl: 0 };
+        addLog(s, `\u{1F91D} ${p.name} \u043F\u043E\u043A\u0443\u043F\u0430\u0435\u0442 \xAB${cell.name}\xBB \u0437\u0430 ${cell.price} \u041C$`);
+      }
+      s.pending = null;
+    });
+    const actToAuction = () => mutate((s) => {
+      addLog(s, `\u{1F528} \xAB${CELLS[s.pending.pos].name}\xBB \u0432\u044B\u0441\u0442\u0430\u0432\u043B\u0435\u043D \u043D\u0430 \u0430\u0443\u043A\u0446\u0438\u043E\u043D! \u0412\u0441\u0435 \u0434\u0435\u043B\u0430\u044E\u0442 \u0442\u0430\u0439\u043D\u044B\u0435 \u0441\u0442\u0430\u0432\u043A\u0438`);
+      s.pending = { type: "auction", pos: s.pending.pos, bids: {} };
+    });
+    const actBid = (amount) => mutate((s) => {
+      if (!s.pending || s.pending.type !== "auction") return;
+      const p = s.players.find((x) => x.id === myId);
+      if (!p || p.bankrupt) return;
+      s.pending.bids[myId] = Math.max(0, Math.min(amount, p.money));
+      tryResolveAuction(s);
+    });
+    const actTradeOffer = (offer) => mutate((s) => {
+      if (s.trade) return;
+      s.trade = offer;
+      const to = s.players.find((x) => x.id === offer.to);
+      addLog(s, `\u{1F501} ${me.name} \u043F\u0440\u0435\u0434\u043B\u0430\u0433\u0430\u0435\u0442 \u043E\u0431\u043C\u0435\u043D \u2192 ${to ? to.name : "?"}`);
+    });
+    const actTradeCancel = () => mutate((s) => {
+      s.trade = null;
+    });
+    const actTradeDecline = () => mutate((s) => {
+      addLog(s, `\u274C \u041E\u0431\u043C\u0435\u043D \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D`);
+      s.trade = null;
+    });
+    const actTradeAccept = () => mutate((s) => {
+      const t = s.trade;
+      if (!t) return;
+      const a = s.players.find((x) => x.id === t.from);
+      const b = s.players.find((x) => x.id === t.to);
+      const intFor = (arr) => arr.reduce((sum, i) => sum + (s.owners[i] && s.owners[i].mort ? Math.round(CELLS[i].price * 0.05) : 0), 0);
+      const intA = intFor(t.getProps);
+      const intB = intFor(t.giveProps);
+      const ok = a && b && !a.bankrupt && !b.bankrupt && a.money >= t.giveMoney + intA && b.money >= t.getMoney + intB && t.giveProps.every((i) => s.owners[i] && s.owners[i].pid === a.id && s.owners[i].lvl === 0) && t.getProps.every((i) => s.owners[i] && s.owners[i].pid === b.id && s.owners[i].lvl === 0);
+      if (!ok) {
+        addLog(s, `\u26A0\uFE0F \u041E\u0431\u043C\u0435\u043D \u0441\u043E\u0440\u0432\u0430\u043B\u0441\u044F \u2014 \u0443\u0441\u043B\u043E\u0432\u0438\u044F \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0438\u0441\u044C`);
+        s.trade = null;
+        return;
+      }
+      a.money += t.getMoney - t.giveMoney;
+      b.money += t.giveMoney - t.getMoney;
+      for (const i of t.giveProps) s.owners[i].pid = b.id;
+      for (const i of t.getProps) s.owners[i].pid = a.id;
+      if (intA > 0) {
+        a.money -= intA;
+        addLog(s, `\u{1F3E6} ${a.name} \u043F\u043B\u0430\u0442\u0438\u0442 10% \u043F\u043E \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043D\u044B\u043C \u0437\u0430\u043B\u043E\u0433\u0430\u043C: ${intA} \u041C$`);
+      }
+      if (intB > 0) {
+        b.money -= intB;
+        addLog(s, `\u{1F3E6} ${b.name} \u043F\u043B\u0430\u0442\u0438\u0442 10% \u043F\u043E \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043D\u044B\u043C \u0437\u0430\u043B\u043E\u0433\u0430\u043C: ${intB} \u041C$`);
+      }
+      addLog(s, `\u{1F91D} \u041E\u0431\u043C\u0435\u043D \u0441\u043E\u0441\u0442\u043E\u044F\u043B\u0441\u044F: ${a.name} \u21C4 ${b.name}`);
+      s.trade = null;
+    });
+    const actPayJail = () => mutate((s) => {
+      const p = s.players[s.turn];
+      pay(s, p, JAIL_FEE, potOn(s) ? "pot" : "bank");
+      p.inJail = false;
+      p.jailTurns = 0;
+      addLog(s, `\u{1F527} ${p.name} \u043F\u043B\u0430\u0442\u0438\u0442 \u043C\u0435\u0445\u0430\u043D\u0438\u043A\u0430\u043C ${JAIL_FEE} \u041C$ \u2014 \u043C\u0430\u0448\u0438\u043D\u0430 \u0433\u043E\u0442\u043E\u0432\u0430`);
+    });
+    const actBuild = (pos) => mutate((s) => {
+      const p = s.players[s.turn];
+      const cell = CELLS[pos];
+      const cost = upCost(cell.price);
+      if (canBuildAt(s, p.id, pos).ok && p.money >= cost) {
+        p.money -= cost;
+        s.owners[pos].lvl += 1;
+        addLog(s, `\u{1F529} ${p.name} \u0441\u0442\u0430\u0432\u0438\u0442 \u0430\u043F\u0433\u0440\u0435\u0439\u0434 \u043D\u0430 \xAB${cell.name}\xBB (\u0443\u0440. ${s.owners[pos].lvl})`);
+      }
+    });
+    const actSellUp = (pos) => mutate((s) => {
+      const p = s.players[s.turn];
+      if (!canSellUpAt(s, p.id, pos).ok) return;
+      const o = s.owners[pos];
+      o.lvl -= 1;
+      const back = Math.round(upCost(CELLS[pos].price) / 2);
+      p.money += back;
+      if (p.money >= 0) p.debtTo = null;
+      addLog(s, `\u{1F527} ${p.name} \u0441\u043D\u0438\u043C\u0430\u0435\u0442 \u0430\u043F\u0433\u0440\u0435\u0439\u0434 \u0441 \xAB${CELLS[pos].name}\xBB: +${back} \u041C$`);
+    });
+    const actMortgage = (pos) => mutate((s) => {
+      const p = s.players[s.turn];
+      const o = s.owners[pos];
+      const cell = CELLS[pos];
+      if (!o || o.pid !== p.id || o.lvl > 0 || o.mort) return;
+      if (cell.g && groupHasBuildings(s, cell.g)) return;
+      o.mort = true;
+      const val = Math.round(cell.price / 2);
+      p.money += val;
+      if (p.money >= 0) p.debtTo = null;
+      addLog(s, `\u{1F3E6} ${p.name} \u0437\u0430\u043A\u043B\u0430\u0434\u044B\u0432\u0430\u0435\u0442 \xAB${cell.name}\xBB: +${val} \u041C$`);
+    });
+    const actUnmortgage = (pos) => mutate((s) => {
+      const p = s.players[s.turn];
+      const o = s.owners[pos];
+      const cell = CELLS[pos];
+      const cost = Math.round(cell.price * 0.55);
+      if (!o || o.pid !== p.id || !o.mort || p.money < cost) return;
+      p.money -= cost;
+      o.mort = false;
+      addLog(s, `\u{1F4B0} ${p.name} \u0432\u044B\u043A\u0443\u043F\u0430\u0435\u0442 \xAB${cell.name}\xBB \u0438\u0437 \u0437\u0430\u043B\u043E\u0433\u0430: \u2212${cost} \u041C$`);
+    });
+    const actUseGojf = () => mutate((s) => {
+      const p = s.players[s.turn];
+      if (!p.inJail || !p.gojf || !p.gojf.length) return;
+      const deck = p.gojf.shift();
+      ensureDecks(s);
+      s.decks[deck].push(deck === "chance" ? GOJF_CHANCE_IDX : GOJF_CHEST_IDX);
+      p.inJail = false;
+      p.jailTurns = 0;
+      addLog(s, `\u{1F39F} ${p.name} \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u043A\u0430\u0440\u0442\u0443 \xAB\u0412\u044B\u0445\u043E\u0434 \u0441 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0430 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E\xBB`);
+    });
+    const actBankrupt = () => mutate((s) => declareBankrupt(s, s.players[s.turn]));
+    const leave = () => {
+      setCode(null);
+      setSt(null);
+      setMyId(null);
+      setScreen("home");
+    };
+    const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+    .f1root{min-height:100vh;background:#0C0E12;color:#EDEFF3;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+      background-image:radial-gradient(1200px 500px at 50% -200px,#1A1430 0%,transparent 60%);}
+    .disp{font-family:'Russo One',Impact,sans-serif;letter-spacing:.04em;}
+    .btn{border:none;border-radius:10px;padding:12px 18px;font-family:'Russo One',sans-serif;font-size:15px;
+      cursor:pointer;transition:transform .08s,opacity .15s;letter-spacing:.03em;}
+    .btn:active{transform:scale(.96);}
+    .btn:disabled{opacity:.4;cursor:default;}
+    .btn-red{background:#E10600;color:#fff;}
+    .btn-ghost{background:#22262F;color:#EDEFF3;}
+    .btn-gold{background:#F5C518;color:#1a1a1a;}
+    .inp{width:100%;box-sizing:border-box;background:#171A21;border:1px solid #2C313C;border-radius:10px;
+      color:#fff;padding:13px 14px;font-size:16px;outline:none;}
+    .inp:focus{border-color:#E10600;}
+    .kerb{background:repeating-linear-gradient(45deg,#E10600 0 10px,#fff 10px 20px);}
+    .card{background:#171A21;border:1px solid #262B36;border-radius:14px;}
+    .cellbtn{position:relative;background:#171A21;border:1px solid #232834;display:flex;align-items:center;
+      justify-content:center;cursor:pointer;overflow:hidden;padding:0;}
+    .pulse{animation:pulse 1.4s infinite;}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(225,6,0,.55);}50%{box-shadow:0 0 0 5px rgba(225,6,0,0);}}
+    @media (prefers-reduced-motion:reduce){.pulse{animation:none;}}
+    .fade{animation:fade .25s ease-out;}
+    @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  `;
+    if (noDb) {
+      return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: 20 } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { className: "card", style: { maxWidth: 420, padding: 22 } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 20, marginBottom: 10 } }, "\u2699\uFE0F \u041D\u0443\u0436\u0435\u043D \u043A\u043E\u043D\u0444\u0438\u0433 Supabase"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14.5, lineHeight: 1.6, color: "#B8BFCC" } }, "\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 index.html \u0438 \u0432\u0441\u0442\u0430\u0432\u044C\u0442\u0435 SUPABASE_URL \u0438 SUPABASE_ANON_KEY \u0432 \u043E\u0442\u043C\u0435\u0447\u0435\u043D\u043D\u044B\u0439 \u0431\u043B\u043E\u043A \u0432 \u043D\u0430\u0447\u0430\u043B\u0435 \u0444\u0430\u0439\u043B\u0430. \u0418\u0445 \u0432\u044B\u0434\u0430\u0451\u0442 supabase.com: Project Settings \u2192 API. \u0417\u0430\u0442\u0435\u043C \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0435 SQL-\u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u0438\u0437 \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u0438.")));
+    }
+    if (screen === "home") {
+      return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px" } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 420, width: "100%", paddingTop: 48, paddingBottom: 40 } }, /* @__PURE__ */ React.createElement("div", { className: "kerb", style: { height: 10, borderRadius: 6, marginBottom: 26 } }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 40, lineHeight: 1.05, color: "#fff" } }, "F1", /* @__PURE__ */ React.createElement("span", { style: { color: "#E10600" } }, " \u041C\u041E\u041D\u041E\u041F\u041E\u041B\u0418\u042F")), /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", marginTop: 10, fontSize: 15, lineHeight: 1.5 } }, "\u0421\u043A\u0443\u043F\u0430\u0439\u0442\u0435 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438, \u043A\u043E\u043C\u0430\u043D\u0434\u044B \u0438 \u0448\u0438\u043D\u044B. \u041E\u043D\u043B\u0430\u0439\u043D \u0441 \u0434\u0440\u0443\u0437\u044C\u044F\u043C\u0438 \u2014 \u043A\u0430\u0436\u0434\u044B\u0439 \u0441\u043E \u0441\u0432\u043E\u0435\u0433\u043E \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0430."), lastGame && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", style: { width: "100%", marginTop: 22 }, onClick: () => joinRoom(lastGame.code, lastGame.id) }, "\u21A9\uFE0F \u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u0438\u0433\u0440\u0443 ", lastGame.code), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 18, marginTop: 22 } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 14, color: "#8B93A3", marginBottom: 10 } }, "\u0418\u041C\u042F \u041F\u0418\u041B\u041E\u0422\u0410"), /* @__PURE__ */ React.createElement("input", { className: "inp", maxLength: 14, value: name, onChange: (e) => {
+        setName(e.target.value);
+        setErr("");
+      }, placeholder: "\u041D\u0430\u043F\u0440\u0438\u043C\u0435\u0440, \u0428\u0430\u0440\u043B\u044C" }), /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { width: "100%", marginTop: 14 }, disabled: busy, onClick: createRoom }, "\u{1F3C1} \u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 14 } }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          className: "inp",
+          style: { textTransform: "uppercase", letterSpacing: ".2em", flex: 1 },
+          maxLength: 4,
+          value: joinCode,
+          onChange: (e) => {
+            setJoinCode(e.target.value);
+            setErr("");
+          },
+          placeholder: "\u041A\u041E\u0414"
+        }
+      ), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => joinRoom(joinCode) }, "\u0412\u043E\u0439\u0442\u0438")), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#FF6B6B", marginTop: 12, fontSize: 14 } }, err)), /* @__PURE__ */ React.createElement("div", { style: { color: "#5A6172", fontSize: 12.5, marginTop: 18, lineHeight: 1.6 } }, "2\u20136 \u0438\u0433\u0440\u043E\u043A\u043E\u0432 \xB7 \u0445\u043E\u0434\u044B \u043F\u043E \u043E\u0447\u0435\u0440\u0435\u0434\u0438 \xB7 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u043F\u0430\u0440\u0442\u0438\u0438 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438. \u0414\u0430\u043D\u043D\u044B\u0435 \u043A\u043E\u043C\u043D\u0430\u0442\u044B \u0432\u0438\u0434\u043D\u044B \u0432\u0441\u0435\u043C, \u043A\u0442\u043E \u0438\u0433\u0440\u0430\u0435\u0442 \u0432 \u044D\u0442\u043E\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0438.")));
+    }
+    if (!st || !me) {
+      return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { color: "#8B93A3" } }, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0442\u0440\u0430\u0441\u0441\u044B..."));
+    }
+    if (st.phase === "lobby") {
+      const isHost = st.hostId === myId;
+      return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px" } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 420, width: "100%", paddingTop: 40 } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 15, color: "#8B93A3" } }, "\u041A\u041E\u0414 \u041A\u041E\u041C\u041D\u0410\u0422\u042B"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 56, color: "#F5C518", letterSpacing: ".25em", margin: "4px 0 6px" } }, st.code || code), /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", fontSize: 14, lineHeight: 1.5 } }, "\u0414\u0440\u0443\u0437\u044C\u044F \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u044E\u0442 \u044D\u0442\u043E \u0436\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435, \u0432\u0432\u043E\u0434\u044F\u0442 \u0438\u043C\u044F \u0438 \u044D\u0442\u043E\u0442 \u043A\u043E\u0434."), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: "#8B93A3", marginBottom: 12 } }, "\u0421\u0422\u0410\u0420\u0422\u041E\u0412\u0410\u042F \u0420\u0415\u0428\u0401\u0422\u041A\u0410 \xB7 ", st.players.length, "/6"), st.players.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "fade", style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: i ? "1px solid #232834" : "none" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 14, height: 14, borderRadius: 7, background: p.color } }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600 } }, p.name), p.id === st.hostId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#F5C518" } }, "\u0425\u041E\u0417\u042F\u0418\u041D"), p.id === myId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#8B93A3" } }, "(\u0432\u044B)")))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.4 } }, "\u{1F3C6} \u0411\u0430\u043D\u043A \u041F\u043E\u0434\u0438\u0443\u043C\u0430", /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#8B93A3" } }, "\u0414\u043E\u043C\u0430\u0448\u043D\u0435\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u043E: \u0448\u0442\u0440\u0430\u0444\u044B \u043A\u043E\u043F\u044F\u0442\u0441\u044F \u0438 \u0434\u043E\u0441\u0442\u0430\u044E\u0442\u0441\u044F \u0432\u0441\u0442\u0430\u0432\u0448\u0435\u043C\u0443 \u043D\u0430 \u041F\u043E\u0434\u0438\u0443\u043C. \u0412\u044B\u043A\u043B = \u0441\u0442\u0440\u043E\u0433\u043E \u043F\u043E \u043E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u044B\u043C \u043F\u0440\u0430\u0432\u0438\u043B\u0430\u043C.")), isHost ? /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "btn",
+          style: { padding: "8px 14px", background: st.rules && st.rules.pot ? "#F5C518" : "#22262F", color: st.rules && st.rules.pot ? "#1a1a1a" : "#8B93A3", fontSize: 13 },
+          disabled: busy,
+          onClick: actTogglePot
+        },
+        st.rules && st.rules.pot ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B"
+      ) : /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: st.rules && st.rules.pot ? "#F5C518" : "#5A6172" } }, st.rules && st.rules.pot ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B")), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.4 } }, "\u{1F528} \u0411\u0430\u043D\u043A\u0440\u043E\u0442\u0441\u0442\u0432\u043E \u2192 \u0430\u0443\u043A\u0446\u0438\u043E\u043D", /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#8B93A3" } }, "\u0414\u043E\u043C\u0430\u0448\u043D\u0435\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u043E: \u0438\u043C\u0443\u0449\u0435\u0441\u0442\u0432\u043E \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0430 \u0432\u0441\u0435\u0433\u0434\u0430 \u0443\u0445\u043E\u0434\u0438\u0442 \u0441 \u043C\u043E\u043B\u043E\u0442\u043A\u0430 \u043C\u0435\u0436\u0434\u0443 \u0438\u0433\u0440\u043E\u043A\u0430\u043C\u0438 (\u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u0434\u0435\u043D\u0435\u0433). \u0412\u044B\u043A\u043B = \u043E\u0444\u0438\u0446\u0438\u0430\u043B\u044C\u043D\u043E: \u0432\u0441\u0451 \u0434\u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u043A\u0440\u0435\u0434\u0438\u0442\u043E\u0440\u0443.")), isHost ? /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "btn",
+          style: { padding: "8px 14px", background: st.rules && st.rules.bankAuction ? "#F5C518" : "#22262F", color: st.rules && st.rules.bankAuction ? "#1a1a1a" : "#8B93A3", fontSize: 13 },
+          disabled: busy,
+          onClick: actToggleBankAuction
+        },
+        st.rules && st.rules.bankAuction ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B"
+      ) : /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: st.rules && st.rules.bankAuction ? "#F5C518" : "#5A6172" } }, st.rules && st.rules.bankAuction ? "\u0412\u041A\u041B" : "\u0412\u042B\u041A\u041B")), isHost ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red pulse", style: { width: "100%", marginTop: 18 }, disabled: st.players.length < 2 || busy, onClick: actStart }, "\u{1F6A6} \u0421\u0442\u0430\u0440\u0442 \u0433\u043E\u043D\u043A\u0438 ", st.players.length < 2 ? "(\u043D\u0443\u0436\u043D\u043E \u22652)" : "") : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", marginTop: 18, fontSize: 14 } }, "\u0416\u0434\u0451\u043C, \u043A\u043E\u0433\u0434\u0430 \u0445\u043E\u0437\u044F\u0438\u043D \u0434\u0430\u0441\u0442 \u0441\u0442\u0430\u0440\u0442..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 12 }, onClick: leave }, "\u0412\u044B\u0439\u0442\u0438")));
+    }
+    const playersAt = (i) => st.players.filter((p) => !p.bankrupt && p.pos === i);
+    const inDebt = me.money < 0;
+    const canRoll = myTurn && !st.rolled && !st.pending && !inDebt;
+    const canEnd = myTurn && st.rolled && !st.pending && !inDebt;
+    const winnerP = st.winner && st.players.find((p) => p.id === st.winner);
+    const cellEl = (i) => {
+      const c = CELLS[i];
+      const [r, col] = cellRC(i);
+      const o = st.owners[i];
+      const ownerP = o && st.players.find((p) => p.id === o.pid);
+      const here = playersAt(i);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: i,
+          className: "cellbtn",
+          onClick: () => setOpenCell(i),
+          style: {
+            gridRow: r + 1,
+            gridColumn: col + 1,
+            borderRadius: 4,
+            ...c.t === "start" ? { background: "repeating-conic-gradient(#fff 0 25%, #14171E 0 50%) 0 0/8px 8px" } : {},
+            ...st.phase === "playing" && cur && !cur.bankrupt && cur.pos === i ? { boxShadow: `0 0 0 2px ${cur.color}, 0 0 9px ${cur.color}`, zIndex: 3 } : {}
+          }
+        },
+        c.g && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "26%", background: GROUPS[c.g].c } }),
+        c.tc && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: "26%", background: c.tc } }),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: "min(4vw,17px)", zIndex: 1, filter: c.t === "start" ? "drop-shadow(0 0 2px #000)" : "none" } }, c.e),
+        o && o.lvl > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "24%", right: 1, fontSize: 7, color: "#F5C518", zIndex: 2 } }, o.lvl >= 5 ? "\u2605" : "\u2022".repeat(o.lvl)),
+        ownerP && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4, background: ownerP.color } }),
+        o && o.mort && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(10,12,16,.6)", zIndex: 2, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", fontSize: 8, padding: 1 } }, "\u{1F512}"),
+        here.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 5, left: 2, right: 2, display: "flex", gap: 1, justifyContent: "center", zIndex: 2 } }, here.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { width: 9, height: 9, borderRadius: 5, background: p.color, border: "1.5px solid #fff", boxShadow: "0 0 3px #000" } })))
+      );
+    };
+    const listEl = () => {
+      const row = (i) => {
+        const c = CELLS[i];
+        const o = st.owners[i];
+        const ownerP = o && st.players.find((p) => p.id === o.pid);
+        const here = playersAt(i);
+        let right;
+        if (!o) right = /* @__PURE__ */ React.createElement("span", { style: { color: "#8B93A3", fontSize: 12.5, flexShrink: 0 } }, c.price, " \u041C$");
+        else if (o.mort) right = /* @__PURE__ */ React.createElement("span", { style: { color: "#FF8787", fontSize: 12, flexShrink: 0 } }, "\u{1F512} \u0437\u0430\u043B\u043E\u0433");
+        else if (c.t === "util") right = /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 12, flexShrink: 0 } }, utilCount(st, o.pid) === 2 ? "10" : "4", "\xD7 \u0431\u0440\u043E\u0441\u043A\u0430");
+        else right = /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 12.5, flexShrink: 0 } }, "\u0430\u0440\u0435\u043D\u0434\u0430 ", calcRent(st, i, 7));
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: i,
+            onClick: () => setOpenCell(i),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              padding: "9px 10px",
+              background: "#171A21",
+              border: "1px solid #232834",
+              borderLeft: `4px solid ${c.g ? GROUPS[c.g].c : c.tc || "#2C313C"}`,
+              color: "#fff",
+              borderRadius: 8,
+              marginBottom: 4,
+              cursor: "pointer",
+              boxSizing: "border-box"
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16 } }, c.e),
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "left", fontSize: 13.5, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" } }, c.name, o && o.lvl > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518", fontSize: 11 } }, o.lvl >= 5 ? "\u2605" : "\u2022".repeat(o.lvl)), here.map((p) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { width: 9, height: 9, borderRadius: 5, background: p.color, border: "1px solid #fff", display: "inline-block" } }))),
+          ownerP && /* @__PURE__ */ React.createElement("span", { style: { width: 10, height: 10, borderRadius: 5, background: ownerP.color, flexShrink: 0 }, title: ownerP.name }),
+          right
+        );
+      };
+      const header = (txt) => /* @__PURE__ */ React.createElement("div", { className: "disp", key: "h" + txt, style: { fontSize: 11, color: "#5A6172", margin: "10px 2px 6px" } }, txt);
+      const items = [];
+      for (const g of Object.keys(GROUPS)) {
+        items.push(header(GROUPS[g].name.toUpperCase()));
+        CELLS.forEach((c, i) => {
+          if (c.g === g) items.push(row(i));
+        });
+      }
+      items.push(header("\u041A\u041E\u041C\u0410\u041D\u0414\u042B"));
+      CELLS.forEach((c, i) => {
+        if (c.t === "team") items.push(row(i));
+      });
+      items.push(header("\u041F\u041E\u0421\u0422\u0410\u0412\u0429\u0418\u041A\u0418"));
+      CELLS.forEach((c, i) => {
+        if (c.t === "util") items.push(row(i));
+      });
+      return /* @__PURE__ */ React.createElement("div", { className: "card", style: { maxHeight: "55vh", overflowY: "auto", padding: "4px 8px 8px" } }, items);
+    };
+    const cellModal = () => {
+      if (openCell == null) return null;
+      const c = CELLS[openCell];
+      const o = st.owners[openCell];
+      const ownerP = o && st.players.find((p) => p.id === o.pid);
+      const mine = o && o.pid === myId;
+      const rents = c.t === "prop" ? rentTable(c.price) : null;
+      const fullGrp = c.g && o && ownsFullGroup(st, o.pid, c.g);
+      return /* @__PURE__ */ React.createElement("div", { onClick: () => setOpenCell(null), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { className: "card fade", onClick: (e) => e.stopPropagation(), style: { width: "100%", maxWidth: 440, borderRadius: "18px 18px 0 0", padding: 20, maxHeight: "75vh", overflowY: "auto" } }, (c.g || c.tc) && /* @__PURE__ */ React.createElement("div", { style: { height: 8, borderRadius: 4, background: c.g ? GROUPS[c.g].c : c.tc, marginBottom: 12 } }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 22 } }, c.e, " ", c.name), c.g && /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", fontSize: 13, marginTop: 2 } }, GROUPS[c.g].name), c.price && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 15 } }, "\u0426\u0435\u043D\u0430: ", /* @__PURE__ */ React.createElement("b", null, c.price, " \u041C$")), ownerP && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, fontSize: 14, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, "\u0412\u043B\u0430\u0434\u0435\u043B\u0435\u0446: ", /* @__PURE__ */ React.createElement("span", { style: { width: 10, height: 10, borderRadius: 5, background: ownerP.color, display: "inline-block" } }), " ", /* @__PURE__ */ React.createElement("b", null, ownerP.name), o.lvl > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#F5C518" } }, "\xB7 ", o.lvl >= 5 ? "\u0421\u0442\u0430\u0442\u0443\u0441 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438 \u2605" : `\u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B: ${o.lvl}`), o.mort && /* @__PURE__ */ React.createElement("span", { style: { color: "#FF8787" } }, "\xB7 \u{1F512} \u0432 \u0437\u0430\u043B\u043E\u0433\u0435 (\u0430\u0440\u0435\u043D\u0434\u044B \u043D\u0435\u0442)")), rents && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, fontSize: 13.5, color: "#B8BfCC", lineHeight: 1.7 } }, "\u0410\u0440\u0435\u043D\u0434\u0430: ", rents[0], " \u041C$ ", fullGrp && o.lvl === 0 ? `(\xD72 = ${rents[0] * 2} \u2014 \u0432\u0441\u044F \u0433\u0440\u0443\u043F\u043F\u0430!)` : "", /* @__PURE__ */ React.createElement("br", null), "\u0410\u043F\u0433\u0440\u0435\u0439\u0434\u044B 1\u20134: ", rents[1], " / ", rents[2], " / ", rents[3], " / ", rents[4], " \u041C$", /* @__PURE__ */ React.createElement("br", null), "\u2605 \u0421\u0442\u0430\u0442\u0443\u0441 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438: ", /* @__PURE__ */ React.createElement("b", null, rents[5], " \u041C$"), " \xB7 \u0446\u0435\u043D\u0430 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u0430: ", upCost(c.price), " \u041C$"), c.t === "team" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 13.5, color: "#B8BFCC" } }, "\u0410\u0440\u0435\u043D\u0434\u0430 \u043F\u043E \u0447\u0438\u0441\u043B\u0443 \u043A\u043E\u043C\u0430\u043D\u0434 \u0443 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0430: 25 / 50 / 100 / 200 \u041C$"), c.t === "util" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 13.5, color: "#B8BFCC" } }, "\u0410\u0440\u0435\u043D\u0434\u0430: 4\xD7 \u0431\u0440\u043E\u0441\u043E\u043A (10\xD7, \u0435\u0441\u043B\u0438 \u0443 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0430 \u0438 Pirelli, \u0438 DRS)"), c.t === "tax" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 14 } }, "\u0417\u0430\u043F\u043B\u0430\u0442\u0438\u0442\u0435 \u0431\u0430\u043D\u043A\u0443 ", c.amount, " \u041C$"), mine && myTurn && (() => {
+        const cb = c.t === "prop" ? canBuildAt(st, myId, openCell) : { ok: false };
+        const cs = c.t === "prop" ? canSellUpAt(st, myId, openCell) : { ok: false };
+        const canMort = o.lvl === 0 && !o.mort && (!c.g || !groupHasBuildings(st, c.g));
+        const unmortCost = Math.round(c.price * 0.55);
+        return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, cb.ok && /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", disabled: me.money < upCost(c.price) || busy, onClick: () => actBuild(openCell) }, "\u{1F529} \u0410\u043F\u0433\u0440\u0435\u0439\u0434 \u2212", upCost(c.price)), cs.ok && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => actSellUp(openCell) }, "\u0421\u043D\u044F\u0442\u044C \u0430\u043F\u0433\u0440\u0435\u0439\u0434 +", Math.round(upCost(c.price) / 2)), canMort && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy, onClick: () => actMortgage(openCell) }, "\u{1F3E6} \u0417\u0430\u043B\u043E\u0436\u0438\u0442\u044C +", Math.round(c.price / 2)), o.mort && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", disabled: busy || me.money < unmortCost, onClick: () => actUnmortgage(openCell) }, "\u0412\u044B\u043A\u0443\u043F\u0438\u0442\u044C \u2212", unmortCost)), (cb.why || cs.why) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: "#8B93A3", marginTop: 8 } }, "\u2139\uFE0F ", cb.why || cs.why), c.t === "prop" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#5A6172", marginTop: 6 } }, "\u0412 \u0431\u0430\u043D\u043A\u0435: \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u043E\u0432 ", HOUSES_TOTAL - housesUsed(st), "/", HOUSES_TOTAL, " \xB7 \u0441\u0442\u0430\u0442\u0443\u0441\u043E\u0432 \u0413\u0440\u0430\u043D-\u043F\u0440\u0438 ", HOTELS_TOTAL - hotelsUsed(st), "/", HOTELS_TOTAL));
+      })(), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 14 }, onClick: () => setOpenCell(null) }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044C")));
+    };
+    return /* @__PURE__ */ React.createElement("div", { className: "f1root", style: { display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30 } }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", maxWidth: 560, padding: "10px 8px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 8px" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16 } }, "F1", /* @__PURE__ */ React.createElement("span", { style: { color: "#E10600" } }, " \u041C\u041E\u041D\u041E\u041F\u041E\u041B\u0418\u042F")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: toggleSound, style: { background: "none", border: "none", fontSize: 17, cursor: "pointer", padding: 2 } }, snd ? "\u{1F50A}" : "\u{1F507}"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 13, color: "#F5C518", letterSpacing: ".18em" } }, code))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "btn", style: { flex: 1, padding: "8px", fontSize: 13, background: view === "board" ? "#E10600" : "#22262F", color: "#fff" }, onClick: () => setView("board") }, "\u{1F5FA} \u041F\u043E\u043B\u0435"), /* @__PURE__ */ React.createElement("button", { className: "btn", style: { flex: 1, padding: "8px", fontSize: 13, background: view === "list" ? "#E10600" : "#22262F", color: "#fff" }, onClick: () => setView("list") }, "\u{1F4CB} \u0422\u0440\u0430\u0441\u0441\u044B")), view === "board" ? /* @__PURE__ */ React.createElement("div", { className: "kerb", style: { padding: 5, borderRadius: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0E1117", borderRadius: 8, padding: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(11,1fr)", gridTemplateRows: "repeat(11,1fr)", gap: 2, aspectRatio: "1/1" } }, CELLS.map((_, i) => cellEl(i)), /* @__PURE__ */ React.createElement("div", { style: { gridRow: "2 / 11", gridColumn: "2 / 11", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, textAlign: "center", padding: 8 } }, st.phase === "over" && winnerP ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 40 } }, "\u{1F3C6}"), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 20, color: "#F5C518" } }, winnerP.name), /* @__PURE__ */ React.createElement("div", { style: { color: "#8B93A3", fontSize: 13 } }, "\u0427\u0435\u043C\u043F\u0438\u043E\u043D \u043C\u0438\u0440\u0430!")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 12, height: 12, borderRadius: 6, background: cur.color }, className: myTurn ? "pulse" : "" }), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(4vw,17px)" } }, myTurn ? "\u0412\u0410\u0428 \u0425\u041E\u0414" : `\u0425\u041E\u0414: ${cur.name.toUpperCase()}`)), (rolling || st.dice) && /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: "min(8vw,34px)", letterSpacing: ".1em" } }, DICE[(rolling ? animDice : st.dice)[0]], " ", DICE[(rolling ? animDice : st.dice)[1]]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: "#8B93A3" } }, "\u0412\u044B \u0437\u0434\u0435\u0441\u044C: ", CELLS[me.pos].e, " ", CELLS[me.pos].name), (st.pot || 0) > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#F5C518" } }, "\u{1F3C6} \u0411\u0430\u043D\u043A \u041F\u043E\u0434\u0438\u0443\u043C\u0430: ", st.pot, " \u041C$"), cur.inJail && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#FF8787" } }, "\u{1F527} ", cur.name, " \u043D\u0430 \u043F\u0438\u0442-\u043B\u0435\u0439\u043D\u0435")))))) : listEl(), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 8, padding: "8px 12px", display: "flex", gap: 8, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("span", { style: { flexShrink: 0, fontSize: 13 } }, "\u{1F4FB}"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, lineHeight: 1.4 } }, st.log[0])), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: 12 } }, st.phase === "playing" && st.pending && st.pending.type === "auction" && /* @__PURE__ */ React.createElement(AuctionPanel, { st, me, busy, onBid: actBid }), st.phase === "playing" && st.trade && st.trade.from === myId && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, fontSize: 13.5, color: "#8B93A3" } }, /* @__PURE__ */ React.createElement("span", null, "\u23F3 \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043E\u0431\u043C\u0435\u043D\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E..."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { padding: "6px 10px", fontSize: 12 }, disabled: busy, onClick: actTradeCancel }, "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C")), st.phase === "over" ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { width: "100%" }, onClick: leave }, "\u{1F3C1} \u041D\u043E\u0432\u0430\u044F \u0433\u043E\u043D\u043A\u0430") : myTurn ? /* @__PURE__ */ React.createElement(React.Fragment, null, st.pending && st.pending.type === "buy" && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 8 } }, "\u041A\u0443\u043F\u0438\u0442\u044C ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].e, " ", CELLS[st.pending.pos].name), " \u0437\u0430 ", /* @__PURE__ */ React.createElement("b", null, CELLS[st.pending.pos].price, " \u041C$"), "?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { flex: 1 }, disabled: busy || me.money < CELLS[st.pending.pos].price, onClick: actBuy }, "\u041A\u0443\u043F\u0438\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { flex: 1 }, disabled: busy, onClick: actToAuction }, "\u{1F528} \u041D\u0430 \u0430\u0443\u043A\u0446\u0438\u043E\u043D"))), inDebt && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#FF8787", fontSize: 14, marginBottom: 8 } }, "\u26A0\uFE0F \u0414\u043E\u043B\u0433: ", -me.money, " \u041C$. \u0421\u043D\u0438\u043C\u0438\u0442\u0435 \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438\u043B\u0438 \u0437\u0430\u043B\u043E\u0436\u0438\u0442\u0435 \u0442\u0440\u0430\u0441\u0441\u044B (\u0442\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u0441\u0432\u043E\u0435\u0439 \u043A\u043B\u0435\u0442\u043A\u0435) \u2014 \u0438\u043B\u0438 \u0441\u043E\u0439\u0434\u0438\u0442\u0435 \u0441 \u0434\u0438\u0441\u0442\u0430\u043D\u0446\u0438\u0438."), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", color: "#FF8787" }, disabled: busy, onClick: actBankrupt }, "\u{1F3F3}\uFE0F \u041E\u0431\u044A\u044F\u0432\u0438\u0442\u044C \u0431\u0430\u043D\u043A\u0440\u043E\u0442\u0441\u0442\u0432\u043E")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, me.inJail && !st.rolled && (me.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", disabled: busy, onClick: actUseGojf }, "\u{1F39F}"), me.inJail && !st.rolled && /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", disabled: busy || me.money < JAIL_FEE, onClick: actPayJail }, "\u{1F527} \u2212", JAIL_FEE), /* @__PURE__ */ React.createElement("button", { className: "btn btn-red" + (canRoll && !rolling ? " pulse" : ""), style: { flex: 1 }, disabled: !canRoll || busy || rolling, onClick: actRoll }, "\u{1F3B2} \u0411\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u0443\u0431\u0438\u043A\u0438"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-gold", style: { flex: 1 }, disabled: !canEnd || busy || rolling, onClick: actEnd }, "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0445\u043E\u0434 \u25B6")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 8, fontSize: 13 }, disabled: busy || !!st.trade || !!st.pending || inDebt, onClick: () => setTradeOpen(true) }, "\u{1F501} \u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0438\u0442\u044C \u043E\u0431\u043C\u0435\u043D"), /* @__PURE__ */ React.createElement("div", { style: { color: "#5A6172", fontSize: 12, marginTop: 8 } }, "\u0422\u0430\u043F\u043D\u0438\u0442\u0435 \u043F\u043E \u043A\u043B\u0435\u0442\u043A\u0435 \u2014 \u0434\u0435\u0442\u0430\u043B\u0438, \u0430\u043F\u0433\u0440\u0435\u0439\u0434\u044B \u0438 \u043F\u0440\u043E\u0434\u0430\u0436\u0430.")) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8B93A3", fontSize: 14, padding: "4px 0" } }, st.pending && st.pending.type === "buy" ? `\u23F3 ${cur.name} \u0440\u0435\u0448\u0430\u0435\u0442, \u043F\u043E\u043A\u0443\u043F\u0430\u0442\u044C \u043B\u0438 \xAB${CELLS[st.pending.pos].name}\xBB...` : st.pending ? null : `\u23F3 \u0416\u0434\u0451\u043C \u0445\u043E\u0434: ${cur.name}`)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 } }, st.players.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "card", style: { padding: "9px 12px", opacity: p.bankrupt ? 0.4 : 1, border: p.id === cur.id && st.phase === "playing" ? `1px solid ${p.color}` : "1px solid #262B36" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 11, height: 11, borderRadius: 6, background: p.color, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name, p.id === myId ? " (\u0432\u044B)" : "")), /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 16, marginTop: 3, color: p.money < 0 ? "#FF6B6B" : "#fff" } }, p.bankrupt ? "\u{1F3F3}\uFE0F DNF" : `${p.money} \u041C$`, !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#8B93A3" } }, " \xB7 \u{1F3DF} ", Object.values(st.owners).filter((o) => o.pid === p.id).length), !p.bankrupt && (p.gojf || []).length > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#F5C518" } }, " \u{1F39F}", p.gojf.length), p.inJail && !p.bankrupt && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12 } }, " \u{1F527}"))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginTop: 10, padding: "10px 14px", maxHeight: 150, overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 11, color: "#5A6172", marginBottom: 6 } }, "\u0420\u0410\u0414\u0418\u041E \u041A\u041E\u041C\u0410\u041D\u0414\u042B"), st.log.slice(0, 15).map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 13, color: i === 0 ? "#EDEFF3" : "#8B93A3", padding: "2.5px 0", lineHeight: 1.45 } }, l))), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%", marginTop: 10, fontSize: 13 }, onClick: leave }, "\u041F\u043E\u043A\u0438\u043D\u0443\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443")), tradeOpen && /* @__PURE__ */ React.createElement(
+      TradeBuilder,
+      {
+        st,
+        me,
+        busy,
+        onClose: () => setTradeOpen(false),
+        onSend: (o) => {
+          setTradeOpen(false);
+          actTradeOffer(o);
+        }
+      }
+    ), st.trade && st.trade.to === myId && !me.bankrupt && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } }, /* @__PURE__ */ React.createElement("div", { className: "card fade", style: { width: "100%", maxWidth: 400, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { className: "disp", style: { fontSize: 18 } }, "\u{1F501} \u0412\u0430\u043C \u043F\u0440\u0435\u0434\u043B\u0430\u0433\u0430\u044E\u0442 \u043E\u0431\u043C\u0435\u043D"), /* @__PURE__ */ React.createElement(TradeSummary, { st, t: st.trade }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16 } }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-red", style: { flex: 1 }, disabled: busy, onClick: actTradeAccept }, "\u041F\u0440\u0438\u043D\u044F\u0442\u044C"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { flex: 1 }, disabled: busy, onClick: actTradeDecline }, "\u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C")))), cellModal());
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(F1Monopoly));
+})();
+
+</script>
+</body>
+</html>
